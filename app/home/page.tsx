@@ -1,89 +1,44 @@
-'use client'
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
+import { getHabits } from '@/app/actions/habits'
+import { HabitTracker } from '@/components/habits/HabitTracker'
+import { LogoutButton } from './LogoutButton'
+import { getBrasiliaDate, formatBrasiliaDate } from '@/lib/date'
 
-import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+// Força renderização dinâmica (evita cache estático)
+export const dynamic = 'force-dynamic'
 
-export default function HomePage() {
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const router = useRouter()
+export default async function HomePage() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  useEffect(() => {
-    const getUser = async () => {
-      try {
-        const supabase = createClient()
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
-        setUser(user)
-      } catch (error) {
-        console.error('Error getting user:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-    getUser()
-  }, [])
-
-  const handleLogout = async () => {
-    try {
-      const supabase = createClient()
-      await supabase.auth.signOut()
-      router.push('/login')
-      router.refresh()
-    } catch (error) {
-      console.error('Error logging out:', error)
-    }
+  if (!user) {
+    redirect('/login')
   }
 
-  if (loading) {
-    return (
-      <div style={{ 
-        minHeight: '100vh', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center' 
-      }}>
-        <p>Carregando...</p>
-      </div>
-    )
-  }
+  // Sempre usar a data de hoje (Brasília)
+  const todayBrasilia = getBrasiliaDate()
+  const dateString = formatBrasiliaDate(todayBrasilia)
+  const selectedDate = todayBrasilia
+
+  // Buscar hábitos do dia de hoje
+  const habitsResult = await getHabits(dateString)
+  const initialHabits = habitsResult.success && habitsResult.data ? habitsResult.data : []
 
   return (
-    <div style={{ 
-      minHeight: '100vh', 
-      padding: '20px',
-      maxWidth: '800px',
-      margin: '0 auto'
-    }}>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '32px'
-      }}>
-        <h1 style={{ fontSize: '24px' }}>Home</h1>
-        <button
-          onClick={handleLogout}
-          style={{
-            padding: '8px 16px',
-            fontSize: '14px',
-            backgroundColor: '#000',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
-        >
-          Sair
-        </button>
+    <div className="min-h-screen relative">
+      {/* Botão Sair - Canto superior direito */}
+      <div className="absolute top-4 right-4">
+        <LogoutButton />
       </div>
 
-      <div>
-        <p>Bem-vindo, {user?.email}</p>
+      {/* Container principal */}
+      <div className="max-w-2xl mx-auto px-8 pt-24 pb-16">
+        {/* HabitTracker (inclui Header e lista de hábitos) */}
+        <HabitTracker initialHabits={initialHabits} date={dateString} currentDate={selectedDate} />
       </div>
     </div>
   )
 }
-
