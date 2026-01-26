@@ -4,60 +4,61 @@
 
 @layer base {
   :root {
-    /* AÇÃO 1: Paleta "Jewel Tones" - Pigmentos Profundos */
-    /* --background: #050508 (Índigo Quase Preto - A base da noite) */
-    --background: 240 20% 2%;
-    /* --foreground: #e7e5e4 (Papel Antigo) */
-    --foreground: 30 5% 90%;
-    /* --card: #0f0f12 (Camada de Verniz Escuro) */
-    --card: 240 10% 7%;
-    --card-foreground: 30 5% 90%;
-    /* --popover: #0f0f12 */
-    --popover: 240 10% 7%;
-    --popover-foreground: 30 5% 90%;
-    /* --primary: #d4af37 (Ouro Veneziano) */
-    --primary: 45 70% 52%;
-    --primary-foreground: 240 20% 2%;
+    /* AÇÃO 1: High Contrast Dark Mode - Recalibrado para Mobile */
+    /* --background: #000000 (Preto Absoluto - Aproveita OLED) */
+    --background: 0 0% 0%;
+    /* --foreground: #f5f5f4 (Stone 100 - Quase branco para brilho) */
+    --foreground: 24 10% 96%;
+    /* --card: #09090b (Zinc 950 - Apenas um tom acima do preto) */
+    --card: 240 5% 4%;
+    --card-foreground: 24 10% 96%;
+    /* --popover: #09090b */
+    --popover: 240 5% 4%;
+    --popover-foreground: 24 10% 96%;
+    /* --primary: #E5C06E (Ouro mais claro e brilhante) */
+    --primary: 45 65% 68%;
+    --primary-foreground: 0 0% 0%;
     /* --secondary: #1e3a8a (Azul Ultramarino - Para Mente) */
     --secondary: 217 70% 30%;
-    --secondary-foreground: 30 5% 90%;
-    /* --muted: #44403c (Terra de Sombra) */
-    --muted: 30 8% 25%;
-    --muted-foreground: 30 5% 60%;
+    --secondary-foreground: 24 10% 96%;
+    /* --muted: #27272a (Zinc 800) */
+    --muted: 240 4% 16%;
+    /* --muted-foreground: #a1a1aa (Zinc 400 - Mais claro para leitura) */
+    --muted-foreground: 240 5% 65%;
     /* --accent: #9f1239 (Rubi Sangue - Para Corpo/Guerra) */
     --accent: 345 78% 35%;
-    --accent-foreground: 30 5% 90%;
+    --accent-foreground: 24 10% 96%;
     /* --destructive: #9f1239 (Rubi Sangue) */
     --destructive: 345 78% 35%;
-    --destructive-foreground: 30 5% 90%;
-    /* --border: #44403c (Bronze oxidado - sutil) */
-    --border: 30 8% 25%;
-    --input: 30 8% 25%;
-    --ring: 45 70% 52%;
+    --destructive-foreground: 24 10% 96%;
+    /* --border: #27272a (Zinc 800) */
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
+    --ring: 45 65% 68%;
     --radius: 0.5rem;
   }
 
   .dark {
     /* Mesmas cores para modo escuro */
-    --background: 240 20% 2%;
-    --foreground: 30 5% 90%;
-    --card: 240 10% 7%;
-    --card-foreground: 30 5% 90%;
-    --popover: 240 10% 7%;
-    --popover-foreground: 30 5% 90%;
-    --primary: 45 70% 52%;
-    --primary-foreground: 240 20% 2%;
+    --background: 0 0% 0%;
+    --foreground: 24 10% 96%;
+    --card: 240 5% 4%;
+    --card-foreground: 24 10% 96%;
+    --popover: 240 5% 4%;
+    --popover-foreground: 24 10% 96%;
+    --primary: 45 65% 68%;
+    --primary-foreground: 0 0% 0%;
     --secondary: 217 70% 30%;
-    --secondary-foreground: 30 5% 90%;
-    --muted: 30 8% 25%;
-    --muted-foreground: 30 5% 60%;
+    --secondary-foreground: 24 10% 96%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%;
     --accent: 345 78% 35%;
-    --accent-foreground: 30 5% 90%;
+    --accent-foreground: 24 10% 96%;
     --destructive: 345 78% 35%;
-    --destructive-foreground: 30 5% 90%;
-    --border: 30 8% 25%;
-    --input: 30 8% 25%;
-    --ring: 45 70% 52%;
+    --destructive-foreground: 24 10% 96%;
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
+    --ring: 45 65% 68%;
   }
 }
 
@@ -67,17 +68,18 @@
   }
   body {
     @apply bg-background text-foreground;
-    background-image: linear-gradient(to bottom right, #1c1917, #0c0a09);
+    /* AÇÃO 3: Limpeza da Atmosfera - Removido gradiente para preto profundo */
+    background: #000000;
   }
 }
 
-/* AÇÃO 2: Textura de Fundo - Digital Codex / Renaissance */
+/* AÇÃO 3: Limpeza da Atmosfera - Textura reduzida para 2% de opacidade */
 .bg-texture {
   background-color: var(--background);
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.02'/%3E%3C/svg%3E");
 }
 
-/* AÇÃO 2: Animação de "Respiração" - Atmosférica */
+/* AÇÃO 3: Limpeza da Atmosfera - Gradiente reduzido para 2% de opacidade */
 @keyframes breathe {
   0%, 100% { 
     background-position: 0% 50%; 
@@ -88,9 +90,10 @@
 }
 
 .bg-starry-night {
-  background: linear-gradient(-45deg, #050508, #0f172a, #050508, #1e1b4b);
+  background: linear-gradient(-45deg, #000000, #09090b, #000000, #0a0a0a);
   background-size: 400% 400%;
   animation: breathe 15s ease infinite;
+  opacity: 0.02;
 }
 
 /* AÇÃO 2: Animação de Pulso Rápido para Checkbox */

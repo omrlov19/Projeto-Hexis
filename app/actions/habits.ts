@@ -29,10 +29,12 @@ export async function getHabits(dateString: string): Promise<{
     // dateString está no formato YYYY-MM-DD
     const [year, month, day] = dateString.split('-').map(Number)
     const contextDate = new Date(year, month - 1, day) // month é 0-indexed
-    const dayOfWeek = contextDate.getDay() // 0 = domingo, 1 = segunda, etc.
-    // Mapa: 0=sun, 1=mon, 2=tue, 3=wed, 4=thu, 5=fri, 6=sat
+    const todayIndex = contextDate.getDay() // 0 = domingo, 1 = segunda, etc. (0-6)
+    // Converter para string para comparação segura
+    const todayStr = String(todayIndex) // "0", "1", "2", etc.
+    // Mapa: 0=sun, 1=mon, 2=tue, 3=wed, 4=thu, 5=fri, 6=sat (mantido para compatibilidade)
     const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-    const currentDayName = dayNames[dayOfWeek]
+    const currentDayName = dayNames[todayIndex]
 
     // ============================================
     // PASSO 2A: Buscar TODOS os Hábitos do Usuário
@@ -75,18 +77,48 @@ export async function getHabits(dateString: string): Promise<{
     const habitsWithStatus: HabitWithStatus[] = []
 
     for (const habit of allHabits) {
-      const frequencyDays = habit.frequency_days as string[] | null | undefined
+      const frequencyDays = habit.frequency_days as number[] | string[] | null | undefined
+      
+      // Extrair data de criação do hábito (para rede de segurança)
+      const habitCreatedAtISO = habit.created_at
+      const habitCreatedDate = habitCreatedAtISO.split('T')[0] // Extrair YYYY-MM-DD
 
-      // REGRA 1: Recorrência
-      // O hábito tem frequency_days?
-      // Se SIM (ex: ['mon', 'wed']): O dia da semana atual está na lista? Se não, descarte.
-      // Se NÃO (null ou vazio): Considere Diário (sempre aparece).
+      // REGRA 1: Recorrência (Filtro de Dias da Semana)
+      // CORREÇÃO CRÍTICA: Normalização robusta de tipos
       let shouldShow = false
-      if (frequencyDays !== null && Array.isArray(frequencyDays) && frequencyDays.length > 0) {
-        // Hábito recorrente: só aparece se o dia da semana atual estiver na lista
-        shouldShow = frequencyDays.includes(currentDayName)
+      
+      // Fallback de Nulo: Se frequency_days for null ou array vazio -> MOSTRAR (Hábito diário)
+      if (frequencyDays === null || !Array.isArray(frequencyDays) || frequencyDays.length === 0) {
+        shouldShow = true
       } else {
-        // Hábito diário: sempre aparece
+        // Normalize a comparação: Converter tudo para String
+        // Lógica equivalente a: habit.frequency_days?.map(String).includes(String(dayOfWeek))
+        const frequencyDaysAsStrings = frequencyDays.map(d => {
+          // Se for número, converter para string
+          if (typeof d === 'number') {
+            return String(d)
+          }
+          // Se for string, verificar se é nome do dia ('sun', 'mon', etc) ou número ("0", "1", etc)
+          const dayMap: Record<string, string> = {
+            'sun': '0', 'mon': '1', 'tue': '2', 'wed': '3', 'thu': '4', 'fri': '5', 'sat': '6'
+          }
+          const dayLower = String(d).toLowerCase()
+          // Se for nome do dia, converter para número string
+          if (dayMap[dayLower] !== undefined) {
+            return dayMap[dayLower]
+          }
+          // Se já for número string ("0", "1", etc), usar diretamente
+          return String(d)
+        })
+        
+        // Comparação normalizada: todayStr já é string ("0"-"6"), frequencyDaysAsStrings também
+        const dayOfWeekStr = String(todayIndex) // Garantir que é string
+        shouldShow = frequencyDaysAsStrings.includes(dayOfWeekStr)
+      }
+
+      // Rede de Segurança (Vital): Se created_at === dateString -> MOSTRAR SEMPRE
+      // Isso impede que um hábito recém-criado desapareça imediatamente
+      if (!shouldShow && habitCreatedDate === dateString) {
         shouldShow = true
       }
 
@@ -96,12 +128,7 @@ export async function getHabits(dateString: string): Promise<{
 
       // REGRA 2: História
       // created_at do hábito deve ser <= dateString
-      // Normalizar created_at para YYYY-MM-DD para comparação (evitar problemas de timezone)
-      const habitCreatedAtISO = habit.created_at
-      // Extrair apenas a parte da data (YYYY-MM-DD) do created_at
-      // created_at pode vir como ISO string (2026-01-15T10:30:00.000Z) ou já como YYYY-MM-DD
-      const habitCreatedDate = habitCreatedAtISO.split('T')[0]
-      
+      // (Nota: habitCreatedDate já foi extraído acima na linha 84)
       if (habitCreatedDate > dateString) {
         continue // Hábito criado no futuro em relação à data solicitada
       }
@@ -328,7 +355,7 @@ export async function createHabit(data: {
   target_value?: number
   target_unit?: string
   goal_type?: string
-  frequency_days?: string[]
+  frequency_days?: number[] | string[] // Aceita números (0-6) ou strings ('sun', 'mon')
   notification_time?: string
 }): Promise<{
   success: boolean
@@ -366,7 +393,10 @@ export async function createHabit(data: {
       target_value: data.target_value || null,
       target_unit: data.target_unit || null,
       goal_type: data.goal_type || null,
-      frequency_days: data.frequency_days && data.frequency_days.length > 0 ? data.frequency_days : null,
+      // CORREÇÃO DE BUILD: Converter para string[] para compatibilidade com banco
+      frequency_days: data.frequency_days && data.frequency_days.length > 0 
+        ? data.frequency_days.map(String) // Converter number[] ou string[] para string[]
+        : null,
     }
     
     // AÇÃO 3: Adicionar notification_time se fornecido (pode não existir no banco ainda)
@@ -374,15 +404,51 @@ export async function createHabit(data: {
       insertData.notification_time = data.notification_time
     }
     
+    // AÇÃO 1: Debug - Log detalhado antes do insert
+    console.log('🔵 [createHabit] TENTANDO CRIAR HÁBITO:', {
+      title: insertData.title,
+      frequency_days: insertData.frequency_days,
+      frequency_days_type: typeof insertData.frequency_days?.[0],
+      frequency_days_length: insertData.frequency_days?.length,
+      user_id: insertData.user_id,
+      full_data: JSON.stringify(insertData, null, 2)
+    })
+    
     const { data: createdHabit, error: insertError } = await supabase
       .from('hexis_habits')
       .insert(insertData)
       .select()
       .single()
 
-    if (insertError || !createdHabit) {
+    // AÇÃO 1: Debug - Log após o insert
+    if (insertError) {
+      console.error('❌ [createHabit] ERRO AO CRIAR HÁBITO:', {
+        error: insertError,
+        message: insertError.message,
+        details: insertError.details,
+        hint: insertError.hint,
+        code: insertError.code,
+        insertData: JSON.stringify(insertData, null, 2)
+      })
       return { success: false, error: insertError?.message || 'Falha ao criar hábito' }
     }
+    
+    if (!createdHabit) {
+      console.error('❌ [createHabit] HÁBITO NÃO FOI CRIADO (sem erro, mas sem dados):', {
+        insertData: JSON.stringify(insertData, null, 2)
+      })
+      return { success: false, error: 'Falha ao criar hábito' }
+    }
+    
+    // AÇÃO 1: Debug - Log de sucesso
+    console.log('✅ [createHabit] HÁBITO CRIADO COM SUCESSO:', {
+      id: createdHabit.id,
+      title: createdHabit.title,
+      frequency_days: createdHabit.frequency_days,
+      frequency_days_type: typeof createdHabit.frequency_days?.[0],
+      created_at: createdHabit.created_at,
+      full_habit: JSON.stringify(createdHabit, null, 2)
+    })
 
     // Revalidar as rotas (secundário, pois o retorno dos dados é prioritário)
     revalidatePath('/home')
@@ -406,7 +472,7 @@ export async function updateHabit(
     target_value?: number
     target_unit?: string
     goal_type?: string
-    frequency_days?: string[]
+    frequency_days?: number[] | string[] // Aceita números (0-6) ou strings ('sun', 'mon')
     notification_time?: string
   }
 ): Promise<{
@@ -485,8 +551,11 @@ export async function updateHabit(
       updates.goal_type = data.goal_type || null
     }
     if (data.frequency_days !== undefined) {
+      // CORREÇÃO DE BUILD: Converter para string[] para compatibilidade com tipo esperado
       updates.frequency_days =
-        data.frequency_days && data.frequency_days.length > 0 ? data.frequency_days : null
+        data.frequency_days && data.frequency_days.length > 0 
+          ? data.frequency_days.map(String) // Converter number[] ou string[] para string[]
+          : null
     }
     // AÇÃO 3: Adicionar notification_time se fornecido
     if (data.notification_time !== undefined) {

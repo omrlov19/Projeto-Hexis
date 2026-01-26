@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getHabits } from '@/app/actions/habits'
 import { HabitTracker } from '@/components/habits/HabitTracker'
-import { LogoutButton } from './LogoutButton'
 import { getBrasiliaDate, formatBrasiliaDate } from '@/lib/date'
 
 // Força renderização dinâmica (evita cache estático)
@@ -29,13 +28,8 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-screen relative">
-      {/* Botão Sair - Canto superior direito */}
-      <div className="absolute top-4 right-4">
-        <LogoutButton />
-      </div>
-
       {/* Container principal */}
-      <div className="max-w-2xl mx-auto px-8 pt-24 pb-16">
+      <div className="max-w-2xl mx-auto px-8 pt-4 pb-28">
         {/* HabitTracker (inclui Header e lista de hábitos) */}
         <HabitTracker initialHabits={initialHabits} date={dateString} currentDate={selectedDate} />
       </div>

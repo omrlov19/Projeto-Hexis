@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
 import { Cinzel, Cormorant_Garamond } from 'next/font/google'
 import './globals.css'
+import { BottomNav } from '@/components/layout/BottomNav'
+import { FocusProvider } from '@/contexts/FocusContext'
+import { FloatingTimer } from '@/components/FloatingTimer'
 
 const cinzel = Cinzel({
   subsets: ['latin'],
@@ -26,7 +29,11 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className="dark">
       <body className={`${cinzel.variable} ${cormorantGaramond.variable} font-body`}>
-        {children}
+        <FocusProvider>
+          {children}
+          <FloatingTimer />
+          <BottomNav />
+        </FocusProvider>
       </body>
     </html>
   )

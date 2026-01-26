@@ -64,8 +64,8 @@ function SortableReorderItem({
       ref={setNodeRef}
       style={style}
       className={cn(
-        // AÇÃO 3: Itens da Lista - Fundo sutil, texto branco
-        'flex items-center gap-4 p-4 bg-white/5 transition-all duration-300 rounded-sm',
+        // AÇÃO 3: Itens da Lista - Mobile Compact
+        'flex items-center gap-3 py-2 px-3 bg-white/5 transition-all duration-300 rounded-sm',
         isDragging && 'scale-105 shadow-lg z-50 bg-white/10'
       )}
     >
@@ -73,13 +73,13 @@ function SortableReorderItem({
       <div
         {...attributes}
         {...listeners}
-        className="cursor-grab active:cursor-grabbing p-2 touch-none select-none flex-shrink-0"
+        className="cursor-grab active:cursor-grabbing p-1.5 touch-none select-none flex-shrink-0"
       >
-        <GripVertical className="w-5 h-5 text-[#d4af37] transition-colors" />
+        <GripVertical className="w-4 h-4 text-[#d4af37] transition-colors" />
       </div>
 
-      {/* AÇÃO 3: Nome do Hábito - Branco */}
-      <h3 className="text-lg font-heading uppercase tracking-wide text-white flex-1">
+      {/* AÇÃO 3: Nome do Hábito - Mobile Compact */}
+      <h3 className="text-sm font-heading uppercase tracking-wide text-white flex-1">
         {habit.title}
       </h3>
     </div>
@@ -168,15 +168,16 @@ export function HabitReorderDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      {/* AÇÃO 3: Organizador - Fundo Onyx/Glass */}
-      <DialogContent className="max-w-2xl bg-[#0a0a0c]/95 backdrop-blur-xl border border-[#d4af37]/20 shadow-[0_0_50px_-10px_rgba(0,0,0,0.8)]">
+      {/* AÇÃO 1: Container Principal - Aumentado para melhor usabilidade */}
+      <DialogContent className="w-[95%] max-w-[450px] max-h-[85vh] rounded-xl p-4 bg-[#0a0a0c]/95 backdrop-blur-xl border border-[#d4af37]/20 shadow-[0_0_50px_-10px_rgba(0,0,0,0.8)] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="text-[#d4af37] font-heading uppercase tracking-widest text-xl text-center">
+          <DialogTitle className="text-[#d4af37] font-heading uppercase tracking-widest text-lg text-center">
             Organizar Hábitos
           </DialogTitle>
         </DialogHeader>
 
-        <div className="max-h-[60vh] overflow-y-auto">
+        {/* AÇÃO 2: Controle de Altura da Lista - Scroll com limite expandido */}
+        <div className="flex-1 overflow-y-auto pr-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] min-h-0">
           {items.length === 0 ? (
             <div className="flex items-center justify-center py-16">
               <p className="text-white/60 text-center font-body">
@@ -193,7 +194,7 @@ export function HabitReorderDialog({
                 items={items.map((h) => h.id)}
                 strategy={verticalListSortingStrategy}
               >
-                <div className="space-y-0">
+                <div className="space-y-1.5">
                   {items.map((habit) => (
                     <SortableReorderItem key={habit.id} habit={habit} />
                   ))}
@@ -203,11 +204,11 @@ export function HabitReorderDialog({
           )}
         </div>
 
-        <DialogFooter>
-          {/* AÇÃO 3: Botão Concluir - Estilo Lingote de Ouro */}
+        <DialogFooter className="pt-4">
+          {/* AÇÃO 3: Botão Concluir - Mobile Compact */}
           <Button
             onClick={handleClose}
-            className="px-6 py-2 bg-[#d4af37] text-black font-bold hover:shadow-[0_0_20px_rgba(212,175,55,0.6)] transition-all duration-300 font-heading uppercase tracking-widest text-sm"
+            className="w-full h-10 px-4 py-2 bg-[#d4af37] text-black font-bold hover:shadow-[0_0_20px_rgba(212,175,55,0.6)] transition-all duration-300 font-heading uppercase tracking-widest text-xs"
           >
             Concluir
           </Button>

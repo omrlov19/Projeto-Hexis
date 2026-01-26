@@ -1,7 +1,6 @@
 'use client'
 
 import { useMemo } from 'react'
-import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import type { HabitWithStatus } from '@/types/hexis'
 
@@ -28,9 +27,6 @@ function calculateProgress(habits: HabitWithStatus[]) {
 export function Header({ date, habits }: HeaderProps) {
   const progress = useMemo(() => calculateProgress(habits), [habits])
 
-  // Formatar data como DD/MM (sem dia da semana)
-  const formattedDate = format(date, 'dd/MM')
-
   // Determinar cor do indicador de progresso
   const progressColor = useMemo(() => {
     if (!progress) return 'text-muted-foreground/50'
@@ -41,23 +37,18 @@ export function Header({ date, habits }: HeaderProps) {
   }, [progress])
 
   return (
-    <div className="flex items-baseline justify-center gap-3">
-      {/* Data formatada DD/MM */}
-      <h1 className="text-5xl font-heading uppercase tracking-widest text-foreground">
-        {formattedDate}
-      </h1>
-
-      {/* HUD de Progresso */}
+    <div className="flex flex-col items-center justify-center mt-6 mb-8">
+      {/* Contador de Progresso - Acima do Título */}
       {progress && (
-        <span
-          className={cn(
-            'text-lg font-mono font-bold tracking-tight',
-            progressColor
-          )}
-        >
-          {progress.completed}/{progress.total}
+        <span className="text-sm font-mono text-[#d4af37]/70 tracking-widest mb-1">
+          {progress.completed} / {progress.total}
         </span>
       )}
+      
+      {/* Título do App - Estilo Códice */}
+      <h1 className="text-3xl font-heading uppercase tracking-[0.2em] text-[#E5C06E] text-center">
+        HABIT TRACKER
+      </h1>
     </div>
   )
 }

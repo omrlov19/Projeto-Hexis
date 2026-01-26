@@ -13,6 +13,7 @@ export interface Habit {
   goal_type?: 'check' | 'time' | null
   frequency_days?: string[] | null
   position?: number | null
+  notification_time?: string | null
 }
 
 export interface HabitLog {
