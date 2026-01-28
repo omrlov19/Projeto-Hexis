@@ -42,3 +42,11 @@ export interface CreateHabitData {
   goal_type?: 'check' | 'time'
   frequency_days?: string[]
 }
+
+export interface Reminder {
+  id: string
+  title: string
+  date: Date // Data associada
+  time: string | null // Horário opcional (formato "HH:MM" ou null para "Dia Todo")
+  isCompleted: boolean
+}

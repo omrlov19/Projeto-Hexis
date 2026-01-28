@@ -590,6 +590,43 @@ export async function updateHabit(
   }
 }
 
+export async function getAllHabits(): Promise<{
+  success: boolean
+  data?: Habit[]
+  error?: string
+}> {
+  try {
+    const supabase = await createClient()
+
+    // Validar usuário autenticado
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return { success: true, data: [] }
+    }
+
+    // Buscar TODOS os hábitos do usuário (sem filtro de data ou frequency_days)
+    const { data: allHabits, error: habitsError } = await supabase
+      .from('hexis_habits')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('position', { ascending: true })
+
+    if (habitsError) {
+      console.error('Erro ao buscar hábitos:', habitsError)
+      return { success: false, error: habitsError.message }
+    }
+
+    return { success: true, data: allHabits || [] }
+  } catch (error: any) {
+    console.error('❌ ERRO CRÍTICO: Exceção ao buscar todos os hábitos', error?.message, error)
+    return { success: false, error: error?.message || 'Erro ao buscar hábitos' }
+  }
+}
+
 export async function reorderHabits(
   items: { id: string; position: number }[]
 ): Promise<{ success: boolean; error?: string }> {

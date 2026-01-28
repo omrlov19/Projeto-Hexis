@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, memo, useCallback, useRef } from 'react'
-import { getHabits, toggleHabit, deleteHabit } from '@/app/actions/habits'
+import { getHabits, toggleHabit, deleteHabit, getAllHabits } from '@/app/actions/habits'
 import { emitHabitsChanged, HABITS_CHANGED_EVENT } from '@/lib/habits-events'
 import type { HabitWithStatus, Habit } from '@/types/hexis'
 import { CreateHabitDialog } from './CreateHabitDialog'
@@ -17,7 +17,6 @@ import { Input } from '@/components/ui/input'
 import { ArrowUpDown, RotateCcw, Edit2, Trash2, ChevronsLeft, Pencil, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { HabitReorderDialog } from './HabitReorderDialog'
-import { Header } from '@/components/layout/Header'
 import { motion, useMotionValue, useTransform } from 'framer-motion'
 
 interface HabitTrackerProps {
@@ -350,6 +349,7 @@ function HabitItem({
 export function HabitTracker({ initialHabits, date, currentDate }: HabitTrackerProps) {
   // Estado local otimista (fonte da verdade para a UI)
   const [localHabits, setLocalHabits] = useState<HabitWithStatus[]>(initialHabits)
+  const [allHabitsForReorder, setAllHabitsForReorder] = useState<HabitWithStatus[]>([])
   const [loading, setLoading] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [isReorderOpen, setIsReorderOpen] = useState(false)
@@ -792,11 +792,6 @@ export function HabitTracker({ initialHabits, date, currentDate }: HabitTrackerP
 
   return (
     <div className="space-y-6">
-      {/* Título da Data - Primeiro elemento visual */}
-      <div className="text-center mb-4">
-        <Header date={currentDate} habits={localHabits} />
-      </div>
-
       {/* Cabeçalho com Botões de Ação */}
       <div className="flex justify-center gap-4 mb-12">
         <button
@@ -809,7 +804,21 @@ export function HabitTracker({ initialHabits, date, currentDate }: HabitTrackerP
           NOVO HÁBITO
         </button>
         <button
-          onClick={() => setIsReorderOpen(true)}
+          onClick={async () => {
+            // Buscar TODOS os hábitos quando abrir o organizador
+            const result = await getAllHabits()
+            if (result.success && result.data) {
+              // Converter Habit[] para HabitWithStatus[] (adicionar campos de status vazios)
+              const habitsWithStatus: HabitWithStatus[] = result.data.map((h) => ({
+                ...h,
+                completed: false,
+                achieved_value: null,
+                achieved_unit: null,
+              }))
+              setAllHabitsForReorder(habitsWithStatus)
+            }
+            setIsReorderOpen(true)
+          }}
           className="px-6 py-3 border border-border text-foreground md:hover:bg-muted/50 active:bg-muted/50 transition-all duration-300 font-heading uppercase tracking-widest text-sm flex items-center gap-2 touch-manipulation cursor-pointer"
         >
           <ArrowUpDown className="w-4 h-4" />
@@ -940,11 +949,30 @@ export function HabitTracker({ initialHabits, date, currentDate }: HabitTrackerP
       {/* Dialog de Reordenação */}
       <HabitReorderDialog
         open={isReorderOpen}
-        onOpenChange={setIsReorderOpen}
-        habits={localHabits}
+        onOpenChange={(open) => {
+          setIsReorderOpen(open)
+          if (!open) {
+            // Recarregar hábitos quando fechar o dialog para refletir mudanças
+            loadHabits()
+          }
+        }}
+        habits={allHabitsForReorder.length > 0 ? allHabitsForReorder : localHabits}
         onReorder={(newOrderedList) => {
           // Atualização Otimista Imediata (0ms)
-          setLocalHabits(newOrderedList)
+          setAllHabitsForReorder(newOrderedList)
+        }}
+        onEdit={(habit) => {
+          // Fechar o dialog de organização
+          setIsReorderOpen(false)
+          // Abrir o dialog de edição
+          setEditingHabit(habit)
+          setDialogOpen(true)
+        }}
+        onDelete={(habitId) => {
+          // Remover da lista de reordenação também
+          setAllHabitsForReorder((prev) => prev.filter((h) => h.id !== habitId))
+          // Usar a função de delete estável
+          handleDeleteStable(habitId, '')
         }}
       />
     </div>

@@ -3,8 +3,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Plus, Repeat, CheckCircle2, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Reminder } from '@/app/planner/page'
-import type { HabitWithStatus } from '@/types/hexis'
+import type { HabitWithStatus, Reminder } from '@/types/hexis'
 import { formatBrasiliaDate } from '@/lib/date'
 import { getHabits } from '@/app/actions/habits'
 import { useState, useEffect } from 'react'
@@ -159,7 +158,7 @@ export function DayViewModal({ open, onOpenChange, selectedDate, reminders, habi
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-black border border-[#d4af37]/30 text-white max-w-md max-h-[85vh] overflow-hidden flex flex-col p-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b border-white/10">
-          <DialogTitle className="text-xl font-heading uppercase tracking-widest text-[#d4af37]">
+          <DialogTitle className="text-xl font-heading uppercase tracking-widest text-[#d4af37] text-center">
             {dayName}, {dayNumber}
           </DialogTitle>
         </DialogHeader>

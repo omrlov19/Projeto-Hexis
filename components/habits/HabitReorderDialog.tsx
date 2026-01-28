@@ -26,23 +26,36 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical } from 'lucide-react'
+import { GripVertical, MoreVertical, Pencil, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { reorderHabits } from '@/app/actions/habits'
-import type { HabitWithStatus } from '@/types/hexis'
+import type { HabitWithStatus, Habit } from '@/types/hexis'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu'
 
 interface HabitReorderDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   habits: HabitWithStatus[]
   onReorder?: (newHabits: HabitWithStatus[]) => void
+  onEdit?: (habit: Habit) => void
+  onDelete?: (id: string) => void
 }
 
 // Componente Sortable para cada item no Dialog
 function SortableReorderItem({
   habit,
+  onEdit,
+  onDelete,
 }: {
   habit: HabitWithStatus
+  onEdit?: (habit: Habit) => void
+  onDelete?: (id: string) => void
 }) {
   const {
     attributes,
@@ -82,6 +95,47 @@ function SortableReorderItem({
       <h3 className="text-sm font-heading uppercase tracking-wide text-white flex-1">
         {habit.title}
       </h3>
+
+      {/* Menu de Opções (3 Pontinhos) */}
+      {(onEdit || onDelete) && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="p-1.5 text-white/60 hover:text-[#d4af37] transition-colors flex-shrink-0 touch-none select-none"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {onEdit && (
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onEdit(habit)
+                }}
+                className="text-white hover:bg-[#d4af37]/10"
+              >
+                <Pencil className="w-4 h-4 mr-2 text-[#d4af37]" />
+                Editar
+              </DropdownMenuItem>
+            )}
+            {onEdit && onDelete && <DropdownMenuSeparator />}
+            {onDelete && (
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete(habit.id)
+                }}
+                className="text-red-500 hover:bg-red-500/10 focus:bg-red-500/10"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Excluir
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
     </div>
   )
 }
@@ -91,6 +145,8 @@ export function HabitReorderDialog({
   onOpenChange,
   habits,
   onReorder,
+  onEdit,
+  onDelete,
 }: HabitReorderDialogProps) {
   const router = useRouter()
   // Estado local soberano (fonte da verdade para a UI)
@@ -196,7 +252,12 @@ export function HabitReorderDialog({
               >
                 <div className="space-y-1.5">
                   {items.map((habit) => (
-                    <SortableReorderItem key={habit.id} habit={habit} />
+                    <SortableReorderItem
+                      key={habit.id}
+                      habit={habit}
+                      onEdit={onEdit}
+                      onDelete={onDelete}
+                    />
                   ))}
                 </div>
               </SortableContext>

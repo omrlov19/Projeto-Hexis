@@ -96,6 +96,15 @@
   opacity: 0.02;
 }
 
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* AÇÃO 2: Animação de Pulso Rápido para Checkbox */
 @keyframes pulse-flash {
   0%, 100% {
