@@ -150,17 +150,18 @@ export default function PlannerClient({ initialHabits, hideHeader = false }: Pla
   }
 
   // Estado para viewMode com persistência no localStorage
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+  const [viewMode, setViewMode] = useState<ViewMode>('day')
+
+  // Salvar viewMode no localStorage quando mudar
+  useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('planner_view_mode')
       if (saved === 'day' || saved === 'week' || saved === 'month') {
-        return saved
+        setViewMode(saved as ViewMode)
       }
     }
-    return 'day'
-  })
+  }, [])
 
-  // Salvar viewMode no localStorage quando mudar
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('planner_view_mode', viewMode)
@@ -188,13 +189,17 @@ export default function PlannerClient({ initialHabits, hideHeader = false }: Pla
   // AÇÃO 1: Estado para modal de confirmação de exclusão
   const [itemToDelete, setItemToDelete] = useState<string | null>(null)
 
-  // Filtro de visualização do dia: Tudo (hábitos + lembretes) ou Apenas Lembretes (persistido no localStorage)
-  const [listFilter, setListFilter] = useState<'all' | 'reminders'>(() => {
-    if (typeof window === 'undefined') return 'all'
-    const saved = localStorage.getItem('hexis_planner_filter')
-    if (saved === 'all' || saved === 'reminders') return saved
-    return 'all'
-  })
+  // Filtro de visualização do dia: Tudo (hábitos + lembretes) ou Apenas Lembretes
+  const [listFilter, setListFilter] = useState<'all' | 'reminders'>('all')
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('hexis_planner_filter')
+      if (saved === 'all' || saved === 'reminders') {
+        setListFilter(saved)
+      }
+    }
+  }, [])
 
   // Estado para lembretes — fonte de verdade: Supabase
   const [reminders, setReminders] = useState<Reminder[]>([])
