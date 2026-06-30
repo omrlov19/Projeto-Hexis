@@ -53,9 +53,9 @@ export function BottomNav() {
 
   return (
     <nav 
-      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[40] w-[90%] max-w-[400px] lg:max-w-[500px] h-16 rounded-2xl bg-[#0a0a0c]/90 backdrop-blur-md border border-[#d4af37] shadow-[0_4px_20px_rgba(212,175,55,0.3)] pointer-events-none"
+      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[40] w-[90%] max-w-[350px] lg:max-w-[500px] h-16 rounded-2xl bg-[#0a0a0c]/90 backdrop-blur-md border border-[#d4af37] shadow-[0_4px_20px_rgba(212,175,55,0.3)] pointer-events-none"
     >
-      <div className="flex items-center justify-center gap-x-6 lg:gap-x-12 px-4 h-full py-0">
+      <div className="flex items-center justify-around lg:justify-center lg:gap-x-12 px-2 lg:px-4 h-full py-0">
         
         {navItems.map((item) => {
           const Icon = item.icon
@@ -68,15 +68,15 @@ export function BottomNav() {
               prefetch={true}
               className={cn(
                 'flex items-center transition-all duration-300 touch-manipulation cursor-pointer relative pointer-events-auto',
-                'flex-col justify-center px-2 py-0 rounded-lg hover:scale-110 active:scale-95'
+                'flex-col justify-center px-3 py-2 lg:px-2 lg:py-0 rounded-lg hover:scale-110 active:scale-95'
               )}
             >
               <Icon
                 className={cn(
                   'transition-all duration-300',
                   item.href === '/blocker' 
-                    ? 'w-9 h-9 lg:w-10 lg:h-10' // Ícone do olho maior
-                    : 'w-7 h-7 lg:w-8 lg:h-8',  // Tamanho normal pros outros
+                    ? 'w-7 h-7 lg:w-10 lg:h-10' // Ícone do olho maior no desktop
+                    : 'w-7 h-7 lg:w-8 lg:h-8',  // Tamanho normal
                   isActive
                     ? 'text-[#d4af37] drop-shadow-[0_0_8px_rgba(212,175,55,0.4)]'
                     : 'text-stone-600'
