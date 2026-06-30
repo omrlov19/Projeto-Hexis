@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { addDays } from 'date-fns'
 import { createClient } from '@/lib/supabase/server'
 import type { Habit, HabitWithStatus } from '@/types/hexis'
 
@@ -19,7 +20,7 @@ export async function getHabits(dateString: string): Promise<{
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
-      return { success: true, data: [] }
+      return { success: false, error: 'Usuário não autenticado', data: [] }
     }
 
     // ============================================
@@ -37,38 +38,45 @@ export async function getHabits(dateString: string): Promise<{
     const currentDayName = dayNames[todayIndex]
 
     // ============================================
-    // PASSO 2A: Buscar TODOS os Hábitos do Usuário
+    // PASSO 2: Query ÚNICA (Hábitos + Tracking do Dia via LEFT JOIN)
     // ============================================
-    const { data: allHabits, error: habitsError } = await supabase
+    // CRÍTICO: usamos `!left` para NÃO esconder hábitos sem tracking
+    // e filtramos o tracking para trazer APENAS a data solicitada.
+    const { data: rows, error: habitsError } = await supabase
       .from('hexis_habits')
-      .select('*')
+      .select(
+        `
+        id,
+        user_id,
+        title,
+        goal_value,
+        created_at,
+        icon,
+        color,
+        category,
+        period,
+        target_value,
+        target_unit,
+        goal_type,
+        frequency_days,
+        position,
+        notification_time,
+        hexis_daily_tracking!left(
+          habit_id,
+          date,
+          completed,
+          achieved_value,
+          achieved_unit
+        )
+      `
+      )
       .eq('user_id', user.id)
+      // Importante: filtrar o tracking SEM virar inner join.
+      // Com `!left`, o PostgREST mantém os hábitos e traz tracking vazio quando não existir.
+      .eq('hexis_daily_tracking.date', dateString)
 
-    if (habitsError || !allHabits || allHabits.length === 0) {
+    if (habitsError || !rows || rows.length === 0) {
       return { success: true, data: [] }
-    }
-
-    // ============================================
-    // PASSO 2B: Buscar Tracking Apenas para a Data Solicitada
-    // ============================================
-    const habitIds = allHabits.map((h) => h.id)
-    const { data: trackingRecords, error: trackingError } = await supabase
-      .from('hexis_daily_tracking')
-      .select('habit_id, completed, achieved_value, achieved_unit')
-      .eq('user_id', user.id)
-      .eq('date', dateString) // Filtro estrito: apenas tracking da data solicitada
-      .in('habit_id', habitIds)
-
-    // Criar mapa de tracking (habit_id -> tracking data)
-    const trackingMap = new Map()
-    if (!trackingError && trackingRecords) {
-      trackingRecords.forEach((tracking) => {
-        trackingMap.set(tracking.habit_id, {
-          completed: tracking.completed || false,
-          achieved_value: tracking.achieved_value || null,
-          achieved_unit: tracking.achieved_unit || null,
-        })
-      })
     }
 
     // ============================================
@@ -76,7 +84,7 @@ export async function getHabits(dateString: string): Promise<{
     // ============================================
     const habitsWithStatus: HabitWithStatus[] = []
 
-    for (const habit of allHabits) {
+    for (const habit of rows as any[]) {
       const frequencyDays = habit.frequency_days as number[] | string[] | null | undefined
       
       // Extrair data de criação do hábito (para rede de segurança)
@@ -134,16 +142,19 @@ export async function getHabits(dateString: string): Promise<{
       }
 
       // REGRA 3: Status do Dia (O Reset)
-      // Procura no array do Passo B se existe registro para este habit_id
-      const tracking = trackingMap.get(habit.id)
+      // Tracking veio por LEFT JOIN e pode ser vazio/null.
+      const trackingRow = Array.isArray(habit.hexis_daily_tracking)
+        ? habit.hexis_daily_tracking[0]
+        : null
       
       // Se achou: completed = true (ou o valor do banco)
       // Se NÃO achou: completed = false (Aqui acontece o "Reset Automático")
       habitsWithStatus.push({
-        ...habit,
-        completed: tracking?.completed ?? false,
-        achieved_value: tracking?.achieved_value ?? null,
-        achieved_unit: tracking?.achieved_unit ?? null,
+        // Remover o array embarcado do retorno final
+        ...(habit as Omit<HabitWithStatus, 'completed' | 'achieved_value' | 'achieved_unit'>),
+        completed: trackingRow?.completed ?? false,
+        achieved_value: trackingRow?.achieved_value ?? null,
+        achieved_unit: trackingRow?.achieved_unit ?? null,
       })
     }
 
@@ -261,6 +272,27 @@ export async function toggleHabit(
       updates.completed = forceStatus !== undefined ? forceStatus : true
     }
 
+    // Smart Check: focus_sessions é a única fonte de verdade para tempo de foco
+    const dayStart = `${normalizedDate}T00:00:00.000Z`
+    const dayEnd = addDays(new Date(normalizedDate + 'T12:00:00Z'), 1).toISOString().slice(0, 10) + 'T00:00:00.000Z'
+
+    if (updates.completed === false) {
+      // Desmarcar: remover sessões MANUAIS (criadas ao dar check sem timer)
+      const { data: manualSessions } = await supabase
+        .from('hexis_focus_sessions')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('habit_id', habitId)
+        .eq('is_manual', true)
+        .gte('created_at', dayStart)
+        .lt('created_at', dayEnd)
+      if (manualSessions?.length) {
+        for (const row of manualSessions) {
+          await supabase.from('hexis_focus_sessions').delete().eq('id', row.id)
+        }
+      }
+    }
+
     // Executar UPSERT
     const { data: upsertData, error: upsertError } = await supabase
       .from('hexis_daily_tracking')
@@ -272,6 +304,29 @@ export async function toggleHabit(
       return { success: false, error: upsertError.message || 'Falha ao salvar hábito' }
     } else {
       console.log('✅ SUCESSO: Hábito salvo no banco.', { upsertData })
+    }
+
+    // Check sem timer: criar sessão manual para contar na dashboard (uma vez só)
+    if (updates.completed === true) {
+      const { data: existingSessions } = await supabase
+        .from('hexis_focus_sessions')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('habit_id', habitId)
+        .gte('created_at', dayStart)
+        .lt('created_at', dayEnd)
+      if (!existingSessions?.length) {
+        const targetVal = habit.target_value ?? 0
+        const targetUnit = habit.target_unit || 'minutos'
+        const durationSeconds =
+          targetUnit === 'horas' ? Math.round(targetVal * 3600) : Math.round(targetVal * 60)
+        await supabase.from('hexis_focus_sessions').insert({
+          user_id: user.id,
+          habit_id: habitId,
+          duration: Math.max(0, durationSeconds),
+          is_manual: true,
+        })
+      }
     }
 
     revalidatePath('/home')
@@ -380,75 +435,47 @@ export async function createHabit(data: {
       return { success: false, error: 'Título do hábito é obrigatório' }
     }
 
-    // AÇÃO 3: Criar hábito com retorno dos dados criados
-    // notification_time será salvo se o banco tiver a coluna, caso contrário será ignorado
-    const insertData: any = {
+    // Payload alinhado ao schema (types/supabase.ts): hexis_habits — id, user_id, title, goal_type, target_value, target_unit, frequency_days, created_at
+    const payload: Record<string, unknown> = {
       user_id: user.id,
       title: data.title.trim(),
-      goal_value: data.target_value || 1,
-      icon: data.icon || null,
-      color: data.color || null,
-      category: data.category || null,
-      period: data.period || null,
-      target_value: data.target_value || null,
-      target_unit: data.target_unit || null,
-      goal_type: data.goal_type || null,
-      // CORREÇÃO DE BUILD: Converter para string[] para compatibilidade com banco
-      frequency_days: data.frequency_days && data.frequency_days.length > 0 
-        ? data.frequency_days.map(String) // Converter number[] ou string[] para string[]
-        : null,
+      target_value: data.target_value ?? 1,
+      target_unit: data.target_unit ?? null,
+      goal_type: data.goal_type ?? null,
+      icon: data.icon ?? null,
+      color: data.color ?? null,
+      category: data.category ?? null,
+      period: data.period ?? null,
+      frequency_days:
+        data.frequency_days && data.frequency_days.length > 0
+          ? data.frequency_days.map(String)
+          : null,
     }
-    
-    // AÇÃO 3: Adicionar notification_time se fornecido (pode não existir no banco ainda)
     if (data.notification_time) {
-      insertData.notification_time = data.notification_time
+      payload.notification_time = data.notification_time
     }
-    
-    // AÇÃO 1: Debug - Log detalhado antes do insert
-    console.log('🔵 [createHabit] TENTANDO CRIAR HÁBITO:', {
-      title: insertData.title,
-      frequency_days: insertData.frequency_days,
-      frequency_days_type: typeof insertData.frequency_days?.[0],
-      frequency_days_length: insertData.frequency_days?.length,
-      user_id: insertData.user_id,
-      full_data: JSON.stringify(insertData, null, 2)
-    })
-    
+
     const { data: createdHabit, error: insertError } = await supabase
       .from('hexis_habits')
-      .insert(insertData)
+      .insert(payload)
       .select()
       .single()
 
-    // AÇÃO 1: Debug - Log após o insert
     if (insertError) {
-      console.error('❌ [createHabit] ERRO AO CRIAR HÁBITO:', {
-        error: insertError,
-        message: insertError.message,
-        details: insertError.details,
-        hint: insertError.hint,
-        code: insertError.code,
-        insertData: JSON.stringify(insertData, null, 2)
-      })
-      return { success: false, error: insertError?.message || 'Falha ao criar hábito' }
+      console.error(
+        '❌ ERRO CRÍTICO AO SALVAR HÁBITO:',
+        insertError.message,
+        insertError.details
+      )
+      throw new Error(insertError.message)
     }
-    
+
     if (!createdHabit) {
-      console.error('❌ [createHabit] HÁBITO NÃO FOI CRIADO (sem erro, mas sem dados):', {
-        insertData: JSON.stringify(insertData, null, 2)
-      })
+      console.error('❌ ERRO CRÍTICO AO SALVAR HÁBITO: sem dados retornados', payload)
       return { success: false, error: 'Falha ao criar hábito' }
     }
-    
-    // AÇÃO 1: Debug - Log de sucesso
-    console.log('✅ [createHabit] HÁBITO CRIADO COM SUCESSO:', {
-      id: createdHabit.id,
-      title: createdHabit.title,
-      frequency_days: createdHabit.frequency_days,
-      frequency_days_type: typeof createdHabit.frequency_days?.[0],
-      created_at: createdHabit.created_at,
-      full_habit: JSON.stringify(createdHabit, null, 2)
-    })
+
+    console.log('✅ Hábito Salvo com Sucesso:', createdHabit)
 
     // Revalidar as rotas (secundário, pois o retorno dos dados é prioritário)
     revalidatePath('/home')
@@ -624,6 +651,61 @@ export async function getAllHabits(): Promise<{
   } catch (error: any) {
     console.error('❌ ERRO CRÍTICO: Exceção ao buscar todos os hábitos', error?.message, error)
     return { success: false, error: error?.message || 'Erro ao buscar hábitos' }
+  }
+}
+
+/**
+ * Busca APENAS o status (tracking) dos hábitos para uma data específica.
+ * Retorna um mapa de habit_id -> { completed, achieved_value, achieved_unit }
+ * Isso permite atualizar apenas o status sem recarregar toda a estrutura.
+ */
+export async function getHabitsStatus(dateString: string): Promise<{
+  success: boolean
+  data?: Record<string, { completed: boolean; achieved_value: number | null; achieved_unit: string | null }>
+  error?: string
+}> {
+  try {
+    const supabase = await createClient()
+
+    // Validar usuário autenticado
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return { success: false, error: 'Usuário não autenticado' }
+    }
+
+    // Buscar apenas o tracking do dia (sem JOIN com hábitos)
+    const { data: trackingRows, error: trackingError } = await supabase
+      .from('hexis_daily_tracking')
+      .select('habit_id, completed, achieved_value, achieved_unit')
+      .eq('user_id', user.id)
+      .eq('date', dateString)
+
+    if (trackingError) {
+      console.error('Erro ao buscar status dos hábitos:', trackingError)
+      return { success: false, error: trackingError.message }
+    }
+
+    // Converter array em mapa para acesso rápido
+    const statusMap: Record<string, { completed: boolean; achieved_value: number | null; achieved_unit: string | null }> = {}
+    
+    if (trackingRows) {
+      for (const row of trackingRows) {
+        statusMap[row.habit_id] = {
+          completed: row.completed ?? false,
+          achieved_value: row.achieved_value ?? null,
+          achieved_unit: row.achieved_unit ?? null,
+        }
+      }
+    }
+
+    return { success: true, data: statusMap }
+  } catch (error: any) {
+    console.error('❌ ERRO CRÍTICO: Exceção ao buscar status dos hábitos', error?.message, error)
+    return { success: false, error: error?.message || 'Erro ao buscar status dos hábitos' }
   }
 }
 

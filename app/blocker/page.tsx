@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { 
   Shield, 
   X, 
@@ -27,6 +28,7 @@ import {
 } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
 import { getHabits } from '@/app/actions/habits'
+import { saveFocusSession } from '@/app/actions/focus'
 import { HABITS_CHANGED_EVENT } from '@/lib/habits-events'
 import type { HabitWithStatus } from '@/types/hexis'
 import { iconMap } from '@/components/habits/CreateHabitDialog'
@@ -47,6 +49,7 @@ const apps = [
 // Duração padrão: 25 minutos em segundos
 const DEFAULT_DURATION = 25 * 60 // 1500 segundos
 const MAX_BACKGROUND_TIME = 15000 // 15 segundos em milissegundos
+const SKIP_FOCUS_INTRO_KEY = 'hexis_skip_focus_intro'
 
 type FocusStatus = 'idle' | 'running' | 'failed' | 'completed'
 
@@ -56,19 +59,26 @@ type SessionPhase = 'IDLE' | 'RUNNING' | 'SUCCESS'
 // Opções de tempo (5 a 60 minutos, intervalos de 5)
 const TIME_OPTIONS = Array.from({ length: 12 }, (_, i) => (i + 1) * 5) // [5, 10, 15, ..., 60]
 
-export default function BlockerPage() {
+function BlockerContent() {
+  const searchParams = useSearchParams()
+  const taskNameFromUrl = searchParams.get('taskName') ?? ''
+  const autoStartFromUrl = searchParams.get('autoStart') === 'true'
+
   // AÇÃO: Usar contexto global do timer
   const {
     phase,
     timeLeft,
     startTime,
     endTime,
+    durationSeconds,
     isPaused,
     startFocus,
     stopFocus,
     resetFocus,
     getProgress,
+    getElapsedTime,
     togglePause,
+    completeFocusEarly,
   } = useFocus()
   
   // Estado para apps selecionados
@@ -83,8 +93,10 @@ export default function BlockerPage() {
   const [isWarningDialogOpen, setIsWarningDialogOpen] = useState(false)
   const [showGiveUpModal, setShowGiveUpModal] = useState(false)
   const [selectedDuration, setSelectedDuration] = useState(25) // minutos
+  const [skipFocusIntroCheckbox, setSkipFocusIntroCheckbox] = useState(false)
   const timeSelectorRef = useRef<HTMLDivElement | null>(null)
-  
+  const savedSessionRef = useRef(false)
+
   // AÇÃO 2: Integrar WakeLock Hook
   const { requestLock, releaseLock } = useWakeLock()
   
@@ -116,6 +128,16 @@ export default function BlockerPage() {
     return `${pad(m)}:${pad(s)}`
   }
 
+  // Persistir sessão de foco no Supabase quando o timer termina (SUCCESS) — uma vez por sessão
+  useEffect(() => {
+    if (phase === 'SUCCESS' && !savedSessionRef.current) {
+      savedSessionRef.current = true
+      const duration = durationSeconds ?? 0
+      if (duration > 0) saveFocusSession(duration, null)
+    }
+    if (phase === 'IDLE') savedSessionRef.current = false
+  }, [phase, durationSeconds])
+
   // AÇÃO: Detectar quando o timer termina (SUCCESS) e liberar WakeLock
   useEffect(() => {
     if (phase === 'SUCCESS') {
@@ -124,6 +146,13 @@ export default function BlockerPage() {
       setStatus('completed')
     }
   }, [phase, releaseLock])
+
+  // Deep link: autoStart abre o seletor de tempo ao entrar na página
+  useEffect(() => {
+    if (autoStartFromUrl && !isTimeSelectorOpen) {
+      setIsTimeSelectorOpen(true)
+    }
+  }, [autoStartFromUrl])
 
   // Centralizar item selecionado no seletor de tempo ao abrir
   useEffect(() => {
@@ -134,12 +163,15 @@ export default function BlockerPage() {
           // Pula o padding superior (índice 0) e vai para o item (índice + 1)
           const item = timeSelectorRef.current?.children[selectedIndex + 1] as HTMLElement
           if (item) {
-            item.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            item.scrollIntoView({ behavior: 'auto', block: 'center' })
           }
-        }, 200)
+        }, 50)
       }
     }
-  }, [isTimeSelectorOpen, selectedDuration])
+    // A dependência de selectedDuration foi intencionalmente removida
+    // para evitar que o código force um scrollIntoView enquanto o usuário faz o scroll manual (bug de "kick")
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTimeSelectorOpen])
 
   // O "Juiz": Background Detection com Penalização
   useEffect(() => {
@@ -161,6 +193,8 @@ export default function BlockerPage() {
           
           // A Regra: Se ficou mais de 15 segundos fora -> FALHA
           if (delta > MAX_BACKGROUND_TIME) {
+            const elapsed = getElapsedTime()
+            if (elapsed > 0) saveFocusSession(elapsed, null)
             setStatus('failed')
             stopFocus() // AÇÃO: Usar contexto global para parar
             releaseLock() // AÇÃO 2: Liberar WakeLock em caso de falha
@@ -177,7 +211,7 @@ export default function BlockerPage() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [phase, lastBackgroundTime, endTime, releaseLock, stopFocus])
+  }, [phase, lastBackgroundTime, endTime, releaseLock, stopFocus, getElapsedTime])
 
   // Funções de controle
   const handleOpenTimeSelector = () => {
@@ -186,6 +220,10 @@ export default function BlockerPage() {
 
   const handleConfirmTime = () => {
     setIsTimeSelectorOpen(false)
+    if (typeof window !== 'undefined' && window.localStorage.getItem(SKIP_FOCUS_INTRO_KEY) === 'true') {
+      handleAcceptChallenge()
+      return
+    }
     setIsWarningDialogOpen(true)
   }
 
@@ -205,13 +243,13 @@ export default function BlockerPage() {
       if (unit === 'horas' || unit === 'hrs' || unit === 'hours') {
         durationInMinutes = value * 60
       }
-      // Se 'minutos', 'min', etc.: usa value direto
-
-      // Apenas arredondar para inteiro (evitar float); sem clamp
       durationInMinutes = Math.round(durationInMinutes)
-
-      // Define a duração exata e abre o modal de aviso
       setSelectedDuration(durationInMinutes)
+
+      if (typeof window !== 'undefined' && window.localStorage.getItem(SKIP_FOCUS_INTRO_KEY) === 'true') {
+        handleAcceptChallenge(durationInMinutes)
+        return
+      }
       setIsWarningDialogOpen(true)
     } else {
       // AÇÃO 2: Fallback: sem target_value (null ou 0) → abre seletor (valor padrão 25 min)
@@ -219,14 +257,18 @@ export default function BlockerPage() {
     }
   }
 
-  const handleAcceptChallenge = async () => {
+  const handleAcceptChallenge = async (durationOverride?: number) => {
     setIsWarningDialogOpen(false)
-    
+
+    if (skipFocusIntroCheckbox && typeof window !== 'undefined') {
+      window.localStorage.setItem(SKIP_FOCUS_INTRO_KEY, 'true')
+    }
+
     // AÇÃO 2: Ativar WakeLock quando o Foco INICIAR
     await requestLock()
 
-    // Inicia o timer usando o contexto global
-    const durationSeconds = selectedDuration * 60
+    const minutes = durationOverride ?? selectedDuration
+    const durationSeconds = minutes * 60
     startFocus(durationSeconds) // AÇÃO: Usar contexto global
     setStatus('running')
     setLastBackgroundTime(null)
@@ -237,7 +279,9 @@ export default function BlockerPage() {
     setShowGiveUpModal(true) // AÇÃO 2: Abrir modal de confirmação ao invés de desistir imediatamente
   }
 
-  const handleConfirmGiveUp = () => {
+  const handleConfirmGiveUp = async () => {
+    const elapsed = getElapsedTime()
+    if (elapsed > 0) await saveFocusSession(elapsed, null)
     setStatus('failed')
     stopFocus() // AÇÃO: Usar contexto global para parar
     releaseLock() // AÇÃO 2: Liberar WakeLock quando desistir
@@ -389,6 +433,11 @@ export default function BlockerPage() {
           ) : phase === 'IDLE' ? (
             // AÇÃO 1: Fase IDLE — Renderizar apenas se phase === 'IDLE'
             <div className="flex flex-col items-center justify-center py-12 text-center">
+              {taskNameFromUrl && (
+                <p className="text-[#d4af37] font-heading uppercase tracking-wider text-sm mb-4 px-4 py-2 rounded-lg bg-[#d4af37]/10 border border-[#d4af37]/30 max-w-full truncate" title={taskNameFromUrl}>
+                  Tarefa: {taskNameFromUrl}
+                </p>
+              )}
               <button
                 onClick={handleOpenTimeSelector}
                 className="px-12 py-5 bg-[#d4af37] text-black font-heading uppercase tracking-widest text-lg hover:bg-[#d4af37]/90 transition-colors duration-300 rounded-lg shadow-[0_0_20px_rgba(212,175,55,0.3)]"
@@ -455,6 +504,13 @@ export default function BlockerPage() {
                 >
                   {isScreenOff ? <Eye className="w-4 h-4" /> : <Waves className="w-4 h-4" />}
                   {isScreenOff ? 'DESATIVAR FLOW' : 'ATIVAR FLOW'}
+                </button>
+                <button
+                  onClick={completeFocusEarly}
+                  className="px-4 py-2 border border-[#d4af37]/30 bg-[#d4af37]/10 text-[#d4af37] hover:bg-[#d4af37]/20 active:scale-95 transition-all font-heading uppercase tracking-widest text-xs rounded-lg flex items-center gap-2"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  CONCLUÍDA
                 </button>
                 <button
                   onClick={handleGiveUp}
@@ -739,9 +795,17 @@ export default function BlockerPage() {
             </p>
           </div>
 
-          <div className="mt-8">
+          <div className="mt-6 flex flex-col gap-4">
+            <label className="flex items-center gap-3 cursor-pointer text-zinc-300 text-sm font-body">
+              <Checkbox
+                checked={skipFocusIntroCheckbox}
+                onCheckedChange={(checked) => setSkipFocusIntroCheckbox(checked === true)}
+                className="border-zinc-500 data-[state=checked]:bg-[#d4af37] data-[state=checked]:border-[#d4af37]"
+              />
+              Não mostrar esta mensagem novamente
+            </label>
             <button
-              onClick={handleAcceptChallenge}
+              onClick={() => handleAcceptChallenge()}
               className="w-full py-4 bg-[#d4af37] hover:bg-[#b5952f] text-black font-bold text-lg tracking-wider rounded-xl transition-transform active:scale-95"
             >
               INICIAR FOCO
@@ -832,5 +896,13 @@ export default function BlockerPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function BlockerPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-black" />}>
+      <BlockerContent />
+    </Suspense>
   )
 }

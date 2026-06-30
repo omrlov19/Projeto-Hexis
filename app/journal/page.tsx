@@ -263,7 +263,7 @@ export default function JournalPage() {
       </header>
 
       {/* Botão de Novo Registro (Padronizado com Planner e Focus) */}
-      <div className="max-w-6xl mx-auto mb-8">
+      <div className="max-w-3xl mx-auto mb-8 w-full">
         <button
           onClick={() => setIsTemplateSelectorOpen(true)}
           className="w-full py-5 bg-[#d4af37] text-black font-heading uppercase tracking-widest text-lg hover:bg-[#d4af37]/90 transition-colors duration-300 rounded-lg shadow-[0_0_20px_rgba(212,175,55,0.3)]"
@@ -272,10 +272,10 @@ export default function JournalPage() {
         </button>
       </div>
 
-      {/* Layout: Calendário à Esquerda, Conteúdo à Direita */}
-      <div className="flex flex-col lg:flex-row gap-8 max-w-6xl mx-auto">
-        {/* Calendário (Esquerda) */}
-        <div className="lg:w-80 shrink-0">
+      {/* Layout: Tudo Centralizado em Coluna */}
+      <div className="flex flex-col items-center gap-8 max-w-3xl mx-auto w-full">
+        {/* Calendário (Topo/Centro) */}
+        <div className="w-full max-w-[700px] shrink-0">
           {/* Cabeçalho do Mês com Navegação */}
           <div className="flex items-center justify-between mb-6">
             <button
@@ -351,7 +351,7 @@ export default function JournalPage() {
         </div>
 
         {/* Conteúdo (Direita/Centro) */}
-        <div className="flex-1">
+        <div className="flex-1 w-full">
           {/* Só mostrar o editor se estiver em modo de escrita (writingMode ativo) */}
           {/* NÃO mostrar automaticamente após salvar - o usuário deve clicar na data para visualizar */}
           {writingMode && editorDate ? (
@@ -370,8 +370,6 @@ export default function JournalPage() {
                 O Journaling não é um diário, ele é um <span className="text-[#d4af37]">Sistema</span>!
                 <br />
                 Use para <span className="text-[#d4af37]">Descompressão Mental</span> e <span className="text-[#d4af37]">Ordem Diária</span>
-                <br />
-                Crie um "Novo Registro" e seja <span className="text-[#d4af37]">Soberano</span> em sua vida
               </p>
             </div>
           )}

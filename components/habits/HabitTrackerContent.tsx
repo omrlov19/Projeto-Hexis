@@ -1,43 +1,67 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+'use client'
+
+import { useEffect, useState } from 'react'
 import { getHabits } from '@/app/actions/habits'
-import { HabitTracker } from '@/components/habits/HabitTracker'
 import { getBrasiliaDate, formatBrasiliaDate, parseBrasiliaDate } from '@/lib/date'
 import HabitTrackerClient from './HabitTrackerClient'
+import { useRouter } from 'next/navigation'
+import type { HabitWithStatus } from '@/types/hexis'
 
-export default async function HabitTrackerContent({
-  searchParams,
+export default function HabitTrackerContent({
+  date,
 }: {
-  searchParams?: Promise<{ date?: string }> | { date?: string }
+  date?: string
 }) {
-  // Verificar autenticação dentro do Suspense (não bloqueia renderização inicial)
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/login')
-  }
-
-  // Resolver searchParams se for Promise (Next.js 15+) ou usar diretamente
-  const resolvedSearchParams = searchParams instanceof Promise ? await searchParams : searchParams
-
-  // Obter data da URL ou usar hoje
+  const router = useRouter()
+  
+  // Obter data (já resolvida pelo Page) ou usar hoje
   const todayBrasilia = getBrasiliaDate()
-  const dateParam = resolvedSearchParams?.date
-  const dateString = dateParam || formatBrasiliaDate(todayBrasilia)
-  const selectedDate = dateParam ? parseBrasiliaDate(dateParam) : todayBrasilia
+  const dateString = date || formatBrasiliaDate(todayBrasilia)
+  const selectedDate = date ? parseBrasiliaDate(date) : todayBrasilia
 
-  // Buscar hábitos do dia selecionado
-  const habitsResult = await getHabits(dateString)
-  const initialHabits = habitsResult.success && habitsResult.data ? habitsResult.data : []
+  // AÇÃO: Persistência de Dados (Keep Previous Data)
+  // Manter os hábitos da data anterior visíveis durante o carregamento
+  const [habits, setHabits] = useState<HabitWithStatus[]>([])
+  const [isFetching, setIsFetching] = useState(false)
+
+  // Fetch client-side com persistência de dados anteriores
+  useEffect(() => {
+    let cancelled = false
+    
+    // AÇÃO 1: NÃO limpar o estado - manter dados anteriores visíveis
+    // Apenas marcar como "fetching" para aplicar opacidade sutil
+    setIsFetching(true)
+    
+    getHabits(dateString)
+      .then((res) => {
+        if (cancelled) return
+        
+        // Verificar autenticação
+        if (!res.success && res.error === 'Usuário não autenticado') {
+          router.push('/login')
+          return
+        }
+        
+        // AÇÃO 3: Transição Suave - atualizar apenas quando dados chegarem
+        setHabits(res.success && res.data ? res.data : [])
+      })
+      .finally(() => {
+        if (cancelled) return
+        // AÇÃO 2: Remover indicador de carregamento (opacidade volta ao normal)
+        setIsFetching(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [dateString, router])
 
   return (
-    <HabitTrackerClient
-      initialHabits={initialHabits}
-      date={dateString}
-      currentDate={selectedDate}
-    />
+    <div className={isFetching ? 'opacity-70' : undefined}>
+      <HabitTrackerClient
+        initialHabits={habits}
+        date={dateString}
+        currentDate={selectedDate}
+      />
+    </div>
   )
 }

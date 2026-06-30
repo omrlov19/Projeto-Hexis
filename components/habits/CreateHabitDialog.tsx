@@ -94,6 +94,25 @@ interface CreateHabitDialogProps {
   onReplaceHabit?: (tempId: string, realHabit: Habit) => void
 }
 
+// Dias válidos para frequência (evita lixo do banco: text//text..., objetos, etc.)
+const VALID_DAY_IDS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
+const VALID_DAY_NUMS = ['0', '1', '2', '3', '4', '5', '6'] as const
+
+function sanitizeFrequencyDays(raw: unknown): string[] {
+  if (!Array.isArray(raw) || raw.length === 0) return [...VALID_DAY_IDS]
+  const out: string[] = []
+  for (const item of raw.slice(0, 7)) {
+    const s = typeof item === 'string' ? item.trim().toLowerCase() : String(item ?? '').trim().toLowerCase()
+    if (!s) continue
+    if (VALID_DAY_IDS.includes(s as typeof VALID_DAY_IDS[number])) {
+      out.push(s)
+    } else if (VALID_DAY_NUMS.includes(s as typeof VALID_DAY_NUMS[number])) {
+      out.push(VALID_DAY_IDS[Number(s)])
+    }
+  }
+  return out.length > 0 ? [...new Set(out)] : [...VALID_DAY_IDS]
+}
+
 // AÇÃO 1: Definição dos Moldes (Templates)
 const templates = [
   { name: 'Beber Água', icon: 'droplet' },
@@ -144,12 +163,8 @@ export function CreateHabitDialog({
         setTitle(habitToEdit.title || '')
         setIcon(habitToEdit.icon || 'sparkles')
         
-        // AÇÃO 1: Carregar frequência do hábito editado
-        if (habitToEdit.frequency_days && habitToEdit.frequency_days.length > 0) {
-          setFrequency(habitToEdit.frequency_days)
-        } else {
-          setFrequency(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'])
-        }
+        // AÇÃO 1: Carregar frequência do hábito editado (sanitizar para evitar lixo do banco)
+        setFrequency(sanitizeFrequencyDays(habitToEdit.frequency_days))
         
         // AÇÃO 3: Se for tipo "time", ativar meta de tempo
         if (habitToEdit.goal_type === 'time' && habitToEdit.target_value) {
@@ -228,44 +243,30 @@ export function CreateHabitDialog({
       // 3. Criar variável finalFrequency
       let finalFrequency: number[] = []
       
-      // 4. Se o usuário não selecionou dias (array vazio), usar apenas o dia de hoje
-      if (frequency.length === 0) {
-        finalFrequency = [todayIndex]
-      } else {
-        // 5. Se o usuário selecionou dias, percorrer e forçar conversão para Number()
-        finalFrequency = frequency.map(d => {
-          // Se já for número, garantir que seja inteiro
-          if (typeof d === 'number') {
-            return Number(Math.floor(d)) // Garantir inteiro
-          }
-          // Se for string, converter usando o mapa
+      // 4. Se o usuário não selecionou dias (array vazio), a frequência será enviada como vazio 
+      // Isso indica para o backend que o hábito é diário.
+      // Se tiver selecionado dias, mapeamos e validamos.
+      if (frequency.length > 0) {
+        const sanitized = sanitizeFrequencyDays(frequency)
+        finalFrequency = sanitized.map(d => {
           const dayStr = String(d).toLowerCase()
           const num = dayMap[dayStr]
-          // Se não encontrar no mapa, tentar converter diretamente para número
-          if (num !== undefined) {
-            return Number(num)
-          }
-          // Último recurso: tentar Number() direto (caso seja "0", "1", etc)
+          if (num !== undefined) return num
           const parsed = Number(d)
-          return isNaN(parsed) ? todayIndex : Number(Math.floor(parsed))
-        })
-        
-        // Garantir que o dia atual esteja sempre incluído
-        if (!finalFrequency.includes(todayIndex)) {
-          finalFrequency.push(todayIndex)
-        }
+          // Usamos -1 para valores inválidos e os filtramos fora
+          return (isNaN(parsed) || parsed < 0 || parsed > 6) ? -1 : Math.floor(parsed)
+        }).filter(num => num !== -1)
+      } else {
+        finalFrequency = [] // Enviar vazio para ser diário
       }
       
-      // 6. Garantir que o array não esteja vazio (fallback de segurança)
-      if (finalFrequency.length === 0) {
-        finalFrequency = [todayIndex]
+      // 5. Remover duplicatas, garantir inteiros e ordenar (se houver dias selecionados)
+      if (finalFrequency.length > 0) {
+        finalFrequency = [...new Set(finalFrequency)]
+          .map(d => Number(Math.floor(d))) // Forçar inteiros
+          .filter(d => d >= 0 && d <= 6) // Validar range 0-6
+          .sort((a, b) => a - b)
       }
-      
-      // 7. Remover duplicatas, garantir inteiros e ordenar
-      finalFrequency = [...new Set(finalFrequency)]
-        .map(d => Number(Math.floor(d))) // Forçar inteiros
-        .filter(d => d >= 0 && d <= 6) // Validar range 0-6
-        .sort((a, b) => a - b)
       
       // Usar finalFrequency no payload
       const payloadFrequency = finalFrequency
@@ -395,13 +396,13 @@ export function CreateHabitDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent 
         onOpenAutoFocus={(e) => e.preventDefault()}
-        className="fixed z-[9999] gap-0 p-0 shadow-lg bg-[#0a0a0c] border-none w-[100vw] h-[100dvh] max-w-none !top-0 !left-0 !translate-x-0 !translate-y-0 !m-0 data-[state=open]:!slide-in-from-bottom-full duration-200 sm:!top-[50%] sm:!left-[50%] sm:!translate-x-[-50%] sm:!translate-y-[-50%] sm:w-full sm:max-w-lg sm:h-auto sm:rounded-xl sm:border sm:border-white/10 flex flex-col [&>button]:hidden"
+        className="fixed z-[9999] gap-0 p-0 shadow-lg bg-[#0a0a0c] border-none w-[100vw] h-[100dvh] max-w-none !top-0 !left-0 !translate-x-0 !translate-y-0 !m-0 data-[state=open]:!slide-in-from-bottom-full duration-200 sm:!top-[50%] sm:!left-[50%] sm:!translate-x-[-50%] sm:!translate-y-[-50%] sm:w-full sm:max-w-2xl sm:h-auto sm:max-h-[85vh] sm:rounded-xl sm:border sm:border-white/10 flex flex-col [&>button]:hidden overflow-hidden"
       >
         {/* Acessibilidade: Título Obrigatório (Invisível) */}
         <DialogTitle className="sr-only">Criar Novo Hábito</DialogTitle>
 
         {/* Container Principal: Estrutura Flex */}
-        <div className="flex flex-col h-full w-full bg-[#0a0a0c]">
+        <div className="flex flex-col h-full w-full bg-[#0a0a0c] overflow-hidden">
           {/* 1. HEADER (Botão Fechar) */}
           <div className="flex items-center justify-end p-6 shrink-0 relative z-[110]">
             <DialogClose className="p-2 rounded-full bg-white/5 text-white/70 hover:bg-white/10 hover:text-white transition-colors">
@@ -410,8 +411,7 @@ export function CreateHabitDialog({
           </div>
 
           {/* 2. CORPO (Scroll) */}
-          {/* PROBLEMA 2: Adicionar padding bottom extra para garantir que o botão não fique sobreposto pela nav */}
-          <div className="flex-1 overflow-y-auto px-6 pb-32 mb-20 overscroll-contain">
+          <div className="flex-1 overflow-y-auto px-6 pb-8 overscroll-contain custom-scrollbar">
             {/* Título Visual */}
             {step === 'selection' && (
               <h2 className="text-3xl font-heading text-[#d4af37] text-center mt-4 mb-8">
@@ -422,7 +422,7 @@ export function CreateHabitDialog({
             {/* RENDERIZAÇÃO DIRETA (Sem placeholders) */}
             {step === 'selection' ? (
               /* --- Grid de Templates --- */
-              <div className="grid grid-cols-2 gap-4 pb-8">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pb-8">
                 {/* Botão Criar do Zero */}
                 <button
                   type="button"
@@ -579,7 +579,7 @@ export function CreateHabitDialog({
                   <div className="flex gap-3">
                     <button
                       type="button"
-                      onClick={() => setFrequency(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'])}
+                      onClick={() => setFrequency([...VALID_DAY_IDS])}
                       className="px-5 py-3 rounded-full border border-[#d4af37]/30 text-xs font-bold text-white hover:bg-[#d4af37]/10 transition-all"
                     >
                       TODOS

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, memo, useCallback, useRef } from 'react'
-import { getHabits, toggleHabit, deleteHabit, getAllHabits } from '@/app/actions/habits'
+import { getHabits, toggleHabit, deleteHabit, getHabitsStatus } from '@/app/actions/habits'
 import { emitHabitsChanged, HABITS_CHANGED_EVENT } from '@/lib/habits-events'
 import type { HabitWithStatus, Habit } from '@/types/hexis'
 import { CreateHabitDialog } from './CreateHabitDialog'
@@ -14,10 +14,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { ArrowUpDown, RotateCcw, Edit2, Trash2, ChevronsLeft, Pencil, Check } from 'lucide-react'
+import { ArrowUpDown, RotateCcw, Trash2, ChevronsLeft, Pencil, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { HabitReorderDialog } from './HabitReorderDialog'
-import { motion, useMotionValue, useTransform } from 'framer-motion'
+import { motion, useMotionValue, useTransform, AnimatePresence } from 'framer-motion'
+import { playSuccessSound } from '@/lib/sounds'
 
 interface HabitTrackerProps {
   initialHabits: HabitWithStatus[]
@@ -75,24 +76,59 @@ const HabitsListMemoized = memo(({
     )
   }
 
+  // ===== ORDENAÇÃO AUTOMÁTICA ANTES DO RENDER =====
+  // Garantir que não-concluídos aparecem primeiro, concluídos por último
+  const sortedHabits = [...habits].sort((a, b) => {
+    // Critério 1: Status (Não-concluídos primeiro)
+    if (a.completed !== b.completed) {
+      return a.completed ? 1 : -1 // Feitos vão para baixo
+    }
+    // Critério 2: Posição (manter ordem original)
+    return (a.position || 0) - (b.position || 0)
+  })
+
   return (
-    <div className="space-y-3 max-w-xl mx-auto">
-      {habits.map((habit) => (
-        <SwipeableHabitCard
-          key={habit.id}
-          habit={habit}
-          onToggle={(id, completed) => onToggle(id, completed, habit)}
-          onEdit={() => onEdit(habit)}
-          onDelete={() => onDelete(habit.id, habit.title)}
-        />
-      ))}
+    <div className="space-y-3 max-w-xl md:max-w-2xl lg:max-w-4xl mx-auto">
+      <AnimatePresence mode="popLayout">
+        {sortedHabits.map((habit) => (
+          <SwipeableHabitCard
+            key={habit.id}
+            habit={habit}
+            onToggle={(id, completed) => onToggle(id, completed, habit)}
+            onEdit={() => onEdit(habit)}
+            onDelete={() => onDelete(habit.id, habit.title)}
+          />
+        ))}
+      </AnimatePresence>
     </div>
   )
 }, (prevProps, nextProps) => {
-  // Comparação customizada: só re-renderiza se os IDs mudarem
-  const prevIds = prevProps.habits.map(h => h.id).join(',')
-  const nextIds = nextProps.habits.map(h => h.id).join(',')
-  return prevIds === nextIds
+  // Comparação customizada: re-renderiza se IDs mudarem OU se valores de progresso mudarem
+  // CRÍTICO: Comparar também achieved_value e completed para detectar mudanças de progresso
+  if (prevProps.habits.length !== nextProps.habits.length) {
+    return false // Re-renderiza se o tamanho mudou
+  }
+  
+  // Comparar cada hábito individualmente
+  for (let i = 0; i < prevProps.habits.length; i++) {
+    const prev = prevProps.habits[i]
+    const next = nextProps.habits[i]
+    
+    // Se o ID mudou, re-renderiza
+    if (prev.id !== next.id) {
+      return false
+    }
+    
+    // Se o progresso mudou, re-renderiza (CRÍTICO para atualização de barra)
+    if (prev.achieved_value !== next.achieved_value ||
+        prev.achieved_unit !== next.achieved_unit ||
+        prev.completed !== next.completed) {
+      return false
+    }
+  }
+  
+  // Se nada mudou, não re-renderiza
+  return true
 })
 HabitsListMemoized.displayName = 'HabitsListMemoized'
 
@@ -112,7 +148,14 @@ function SwipeableHabitCard({
   const opacity = useTransform(x, [-140, -70, 0], [1, 0.5, 0])
 
   return (
-    <div className="relative overflow-hidden">
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+      transition={{ duration: 0.3 }}
+      className="relative overflow-hidden"
+    >
       {/* AÇÃO 2: Camada de Fundo (Ações) */}
       <div className="absolute inset-0 flex justify-end z-0">
         {/* Botão Editar - Dourado */}
@@ -141,12 +184,13 @@ function SwipeableHabitCard({
         </motion.button>
       </div>
 
-      {/* AÇÃO 2: Camada de Frente (O Card) */}
+      {/* AÇÃO 2: Camada de Frente (O Card) — touch-action: pan-y para scroll vertical no mobile */}
       <motion.div
         drag="x"
         dragConstraints={{ left: -140, right: 0 }}
         dragElastic={0.1}
-        style={{ x }}
+        dragDirectionLock
+        style={{ x, touchAction: 'pan-y' }}
         className="relative z-10"
         onDragEnd={() => {
           // Snap back se não arrastou o suficiente
@@ -165,7 +209,7 @@ function SwipeableHabitCard({
           onDelete={onDelete}
         />
       </motion.div>
-    </div>
+    </motion.div>
   )
 }
 
@@ -222,7 +266,7 @@ function HabitItem({
         'group backdrop-blur-sm border rounded-sm px-4 py-5',
         'shadow-[0_0_15px_-5px_rgba(229,192,110,0.15)]',
         // AÇÃO 1: Correção do Clique Duplo - Hover só em Desktop, Touch em Mobile
-        'transition-all duration-300 active:scale-[0.98] active:bg-white/5',
+        'active:scale-[0.98] active:bg-white/5',
         'cursor-pointer touch-manipulation',
         // AÇÃO 2: Fundo do Card - Quase preto (OPACO para cobrir botões de swipe)
         'bg-[#0a0a0a]',
@@ -240,7 +284,7 @@ function HabitItem({
       {/* AÇÃO 2: Progresso como "Enchimento de Fundo" */}
       {habit.goal_type === 'time' && habit.target_value && habit.target_value > 0 && (
         <div 
-          className="absolute inset-y-0 left-0 bg-[#E5C06E]/10 z-0 transition-all duration-500"
+          className="absolute inset-y-0 left-0 bg-[#E5C06E]/10 z-0"
           style={{ width: `${Math.min(100, progress)}%` }}
         />
       )}
@@ -253,10 +297,11 @@ function HabitItem({
           <motion.button
             type="button"
             onClick={() => onToggle(habit.id, isCompleted)}
-            whileTap={{ scale: 1.1 }}
+            whileTap={{ scale: [1, 1.2, 1] }}
+            transition={{ duration: 0.2 }}
             className={cn(
               // AÇÃO 2: Aumentar Checkbox - w-7 h-7 com área de toque generosa
-              'h-7 w-7 flex-shrink-0 rounded-full border-2 transition-all duration-300 relative overflow-hidden',
+              'h-7 w-7 flex-shrink-0 rounded-full border-2 relative overflow-hidden',
               'cursor-pointer touch-manipulation min-w-[28px] min-h-[28px]',
               'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-card',
               'flex items-center justify-center',
@@ -295,7 +340,7 @@ function HabitItem({
               {/* AÇÃO 2: Texto do Hábito - Quase branco para brilho */}
               <h3
                 className={cn(
-                  'text-lg font-heading uppercase tracking-widest break-words whitespace-normal line-clamp-2 transition-all duration-300',
+                  'text-lg font-heading uppercase tracking-widest break-words whitespace-normal line-clamp-2',
                   isCompleted 
                     ? 'line-through decoration-[#d4af37] text-white/30' 
                     : 'text-[#f5f5f4]'
@@ -347,10 +392,29 @@ function HabitItem({
 }
 
 export function HabitTracker({ initialHabits, date, currentDate }: HabitTrackerProps) {
-  // Estado local otimista (fonte da verdade para a UI)
-  const [localHabits, setLocalHabits] = useState<HabitWithStatus[]>(initialHabits)
+  // CACHE DE ESTRUTURA: Definições dos hábitos (não muda quando troca de data)
+  const [habitsStructure, setHabitsStructure] = useState<Habit[]>(() => {
+    // Extrair apenas a estrutura (sem status) dos initialHabits
+    return initialHabits.map(({ completed, achieved_value, achieved_unit, ...rest }) => rest as Habit)
+  })
+  
+  // STATUS DO DIA: Mapa de habit_id -> status (completed, achieved_value, achieved_unit)
+  const [habitsStatus, setHabitsStatus] = useState<Record<string, { completed: boolean; achieved_value: number | null; achieved_unit: string | null }>>(() => {
+    // Inicializar com o status dos initialHabits
+    const statusMap: Record<string, { completed: boolean; achieved_value: number | null; achieved_unit: string | null }> = {}
+    initialHabits.forEach(h => {
+      statusMap[h.id] = {
+        completed: h.completed ?? false,
+        achieved_value: h.achieved_value ?? null,
+        achieved_unit: h.achieved_unit ?? null,
+      }
+    })
+    return statusMap
+  })
+  
+  // Estado de loading apenas para status (estrutura já está em cache)
+  const [statusLoading, setStatusLoading] = useState(false)
   const [allHabitsForReorder, setAllHabitsForReorder] = useState<HabitWithStatus[]>([])
-  const [loading, setLoading] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [isReorderOpen, setIsReorderOpen] = useState(false)
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null)
@@ -358,52 +422,124 @@ export function HabitTracker({ initialHabits, date, currentDate }: HabitTrackerP
   const [timeValue, setTimeValue] = useState<string>('')
   const [timeUnit, setTimeUnit] = useState<'minutos' | 'horas'>('minutos')
 
+  // DERIVAR: Combinar estrutura + status para criar HabitWithStatus[]
+  // Ordenar: Não concluídos primeiro, concluídos por último
+  const localHabits = useMemo(() => {
+    const habits = habitsStructure.map(habit => ({
+      ...habit,
+      completed: habitsStatus[habit.id]?.completed ?? false,
+      achieved_value: habitsStatus[habit.id]?.achieved_value ?? null,
+      achieved_unit: habitsStatus[habit.id]?.achieved_unit ?? null,
+    } as HabitWithStatus))
+    
+    // Ordenação automática: não concluídos primeiro
+    return [...habits].sort((a, b) => {
+      if (a.completed !== b.completed) {
+        return a.completed ? 1 : -1 // Feitos vão para baixo
+      }
+      return 0
+    })
+  }, [habitsStructure, habitsStatus])
+
   // Calcular stats em tempo real baseadas em localHabits
   const totalTasks = localHabits.length
   const completedTasks = localHabits.filter(h => h.completed === true).length
   const progressString = `${completedTasks}/${totalTasks}`
 
-  // AÇÃO 1: Sincronização Estável (Deep Compare)
-  // Usar useRef para armazenar a string JSON dos hábitos anteriores
-  const previousHabitsRef = useRef<string>('')
+  // AÇÃO 1: Sincronização Inteligente (Estrutura + Status)
+  // Quando a data muda: atualizar estrutura (filtro frequency_days) + buscar status
+  // Quando estrutura muda (criação/edição/deleção): atualizar estrutura + status
+  const previousDateRef = useRef<string>(date)
+  const previousStructureRef = useRef<string>('')
+  const habitsStructureRef = useRef<Habit[]>(habitsStructure)
   
-  // Sincronizar localHabits quando initialHabits mudar
-  // CRÍTICO: Quando a URL muda, o servidor manda `initialHabits` novos (dados do passado/futuro).
-  // O estado local PRECISA resetar para refletir isso.
-  // AÇÃO 1: Deep Compare - Só atualizar se os dados realmente mudaram (comparação profunda)
+  // Manter ref sincronizado com estado
   useEffect(() => {
-    // Normalizar os dados para comparação (remover campos que mudam mas não são relevantes)
-    const normalizeHabits = (habits: HabitWithStatus[]) => {
-      return habits.map(h => ({
-        id: h.id,
-        title: h.title,
-        completed: h.completed,
-        achieved_value: h.achieved_value,
-        achieved_unit: h.achieved_unit,
-        goal_type: h.goal_type,
-        target_value: h.target_value,
-        target_unit: h.target_unit,
-        position: h.position,
-        icon: h.icon,
-        color: h.color,
-        category: h.category,
-        frequency_days: h.frequency_days,
-      }))
+    habitsStructureRef.current = habitsStructure
+  }, [habitsStructure])
+  
+  useEffect(() => {
+    // Extrair estrutura dos initialHabits
+    const newStructure = initialHabits.map(({ completed, achieved_value, achieved_unit, ...rest }) => rest as Habit)
+    const newStructureString = JSON.stringify(newStructure.map(h => h.id).sort())
+    const dateChanged = date !== previousDateRef.current
+    const structureChanged = newStructureString !== previousStructureRef.current
+    
+    // Se a estrutura mudou (novo hábito, edição, deleção, ou filtro de data), atualizar cache
+    if (structureChanged) {
+      previousStructureRef.current = newStructureString
+      // Atualizar estrutura de forma suave (mantém cards visíveis)
+      setHabitsStructure(newStructure)
     }
     
-    const currentHabitsString = JSON.stringify(normalizeHabits(localHabits))
-    const newHabitsString = JSON.stringify(normalizeHabits(initialHabits))
-    
-    // Comparar strings JSON - só atualizar se forem diferentes
-    if (newHabitsString !== previousHabitsRef.current) {
-      previousHabitsRef.current = newHabitsString
+    // Se a data mudou, buscar apenas o status (estrutura já foi atualizada acima se necessário)
+    if (dateChanged) {
+      previousDateRef.current = date
+      // Buscar status do novo dia (mantém cards visíveis, apenas atualiza checks)
+      loadHabitsStatus(date)
+    } else if (structureChanged) {
+      // Se apenas a estrutura mudou (sem mudança de data), sincronizar status dos initialHabits
+      const newStatus: Record<string, { completed: boolean; achieved_value: number | null; achieved_unit: string | null }> = {}
+      initialHabits.forEach(h => {
+        newStatus[h.id] = {
+          completed: h.completed ?? false,
+          achieved_value: h.achieved_value ?? null,
+          achieved_unit: h.achieved_unit ?? null,
+        }
+      })
+      setHabitsStatus(newStatus)
+    }
+  }, [initialHabits, date]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // AÇÃO 2: Buscar APENAS o status quando a data mudar (sem recarregar estrutura)
+  async function loadHabitsStatus(dateString: string) {
+    setStatusLoading(true)
+    try {
+      const result = await getHabitsStatus(dateString)
+      // Usar ref para garantir que estamos usando a estrutura mais recente
+      const currentStructure = habitsStructureRef.current
       
-      // Só atualizar se os dados realmente mudaram
-      if (newHabitsString !== currentHabitsString) {
-        setLocalHabits(initialHabits)
+      if (result.success && result.data) {
+        // Atualizar apenas o status, mantendo a estrutura intacta
+        // Mesclar com status anterior para manter hábitos sem tracking com completed=false
+        setHabitsStatus((prev) => {
+          const newStatus: Record<string, { completed: boolean; achieved_value: number | null; achieved_unit: string | null }> = {}
+          // Para cada hábito na estrutura atual, usar o novo status se existir, senão resetar
+          currentStructure.forEach(habit => {
+            if (result.data![habit.id]) {
+              // Há tracking para este hábito neste dia
+              newStatus[habit.id] = result.data![habit.id]
+            } else {
+              // Não há tracking, resetar para false/null
+              newStatus[habit.id] = {
+                completed: false,
+                achieved_value: null,
+                achieved_unit: null,
+              }
+            }
+          })
+          return newStatus
+        })
+      } else {
+        // Se não houver tracking, resetar todos os status para false/null
+        setHabitsStatus((prev) => {
+          const newStatus: Record<string, { completed: boolean; achieved_value: number | null; achieved_unit: string | null }> = {}
+          currentStructure.forEach(habit => {
+            newStatus[habit.id] = {
+              completed: false,
+              achieved_value: null,
+              achieved_unit: null,
+            }
+          })
+          return newStatus
+        })
       }
+    } catch (error) {
+      console.error('Erro ao buscar status dos hábitos:', error)
+    } finally {
+      setStatusLoading(false)
     }
-  }, [initialHabits]) // eslint-disable-line react-hooks/exhaustive-deps
+  }
 
   // AÇÃO 2: Lógica de Ordenação Visual (sortedHabits)
   // Mantém a regra de "Feitos no Final", mas usa a position para desempatar.
@@ -423,12 +559,21 @@ export function HabitTracker({ initialHabits, date, currentDate }: HabitTrackerP
 
 
   async function loadHabits() {
-    setLoading(true)
+    // Recarregar tudo (estrutura + status) - usado apenas em casos de erro
     const result = await getHabits(date)
     if (result.success && result.data) {
-      setLocalHabits(result.data)
+      const newStructure = result.data.map(({ completed, achieved_value, achieved_unit, ...rest }) => rest as Habit)
+      const newStatus: Record<string, { completed: boolean; achieved_value: number | null; achieved_unit: string | null }> = {}
+      result.data.forEach(h => {
+        newStatus[h.id] = {
+          completed: h.completed ?? false,
+          achieved_value: h.achieved_value ?? null,
+          achieved_unit: h.achieved_unit ?? null,
+        }
+      })
+      setHabitsStructure(newStructure)
+      setHabitsStatus(newStatus)
     }
-    setLoading(false)
   }
 
   // Função para criação otimista de hábito (retorna o tempId para troca posterior)
@@ -447,7 +592,7 @@ export function HabitTracker({ initialHabits, date, currentDate }: HabitTrackerP
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     const now = new Date().toISOString()
     
-    const optimisticHabit: HabitWithStatus = {
+    const optimisticHabit: Habit = {
       id: tempId,
       user_id: '', // Será preenchido pelo servidor
       title: habitData.title,
@@ -464,14 +609,20 @@ export function HabitTracker({ initialHabits, date, currentDate }: HabitTrackerP
         ? habitData.frequency_days 
         : null,
       position: 0, // Adiciona no topo
-      // Estado inicial (reset automático)
-      completed: false,
-      achieved_value: 0,
-      achieved_unit: null,
     }
 
-    // Adicionar ao topo da lista (position: 0)
-    setLocalHabits((prev) => [optimisticHabit, ...prev])
+    // Adicionar estrutura ao topo da lista
+    setHabitsStructure((prev) => [optimisticHabit, ...prev])
+    
+    // Adicionar status inicial (vazio)
+    setHabitsStatus((prev) => ({
+      ...prev,
+      [tempId]: {
+        completed: false,
+        achieved_value: 0,
+        achieved_unit: null,
+      }
+    }))
     
     // Retornar o tempId para troca posterior
     return tempId
@@ -479,20 +630,22 @@ export function HabitTracker({ initialHabits, date, currentDate }: HabitTrackerP
 
   // Função para troca silenciosa de ID (tempId -> realId)
   function handleReplaceHabit(tempId: string, realHabit: Habit) {
-    setLocalHabits((prev) =>
-      prev.map((habit) => {
-        if (habit.id === tempId) {
-          // Substituir o hábito temporário pelo real, mantendo o estado local (completed, achieved_value)
-          return {
-            ...realHabit,
-            completed: habit.completed, // Manter estado local
-            achieved_value: habit.achieved_value, // Manter estado local
-            achieved_unit: habit.achieved_unit, // Manter estado local
-          } as HabitWithStatus
-        }
-        return habit
-      })
+    // Substituir na estrutura
+    setHabitsStructure((prev) =>
+      prev.map((habit) => (habit.id === tempId ? realHabit : habit))
     )
+    
+    // Manter o status existente (se houver)
+    setHabitsStatus((prev) => {
+      const existingStatus = prev[tempId]
+      if (existingStatus) {
+        const newStatus = { ...prev }
+        delete newStatus[tempId]
+        newStatus[realHabit.id] = existingStatus
+        return newStatus
+      }
+      return prev
+    })
   }
 
   function handleToggle(habitId: string, currentCompleted: boolean, habit?: HabitWithStatus) {
@@ -511,21 +664,26 @@ export function HabitTracker({ initialHabits, date, currentDate }: HabitTrackerP
     
     // Se for tipo 'check', marca direto
     if (habitData.goal_type === 'check') {
-      // 1. Atualização Local Imediata (Optimistic UI)
-      setLocalHabits((prev) =>
-        prev.map((h) =>
-          h.id === habitId
-            ? { ...h, completed: newStatus }
-            : h
-        )
-      )
+      // Tocar som de sucesso ao concluir
+      if (newStatus) {
+        playSuccessSound()
+      }
+      
+      // 1. Atualização Local Imediata (Optimistic UI) - Apenas status
+      setHabitsStatus((prev) => ({
+        ...prev,
+        [habitId]: {
+          ...prev[habitId],
+          completed: newStatus,
+        }
+      }))
 
       // 2. Envio em Background (Fire-and-Forget)
       // Usa a prop `date` (string YYYY-MM-DD da URL), não "hoje"
       toggleHabit(habitId, date, undefined, undefined, newStatus).catch((error) => {
         console.error('Erro ao atualizar hábito:', error)
         // Reverter em caso de erro
-        loadHabits()
+        loadHabitsStatus(date)
         })
       return
     }
@@ -534,20 +692,15 @@ export function HabitTracker({ initialHabits, date, currentDate }: HabitTrackerP
     if (habitData.goal_type === 'time') {
       // Se já está feito, desmarca direto (com auto-reset)
       if (currentCompleted) {
-        // 1. Atualização Local Imediata (Optimistic UI)
-        // Zera o achieved_value visualmente quando desmarca
-        setLocalHabits((prev) =>
-          prev.map((h) =>
-            h.id === habitId
-              ? { 
-                  ...h, 
-                  completed: false,
-                  achieved_value: 0,
-                  achieved_unit: null
-                }
-              : h
-          )
-        )
+        // 1. Atualização Local Imediata (Optimistic UI) - Apenas status
+        setHabitsStatus((prev) => ({
+          ...prev,
+          [habitId]: {
+            completed: false,
+            achieved_value: 0,
+            achieved_unit: null,
+          }
+        }))
 
         // 2. Envio em Background (Fire-and-Forget)
         // Se newValue for 0, enviamos explicitamente para o banco limpar
@@ -555,7 +708,7 @@ export function HabitTracker({ initialHabits, date, currentDate }: HabitTrackerP
         toggleHabit(habitId, date, 0, undefined, false).catch((error) => {
           console.error('Erro ao desmarcar hábito:', error)
           // Reverter em caso de erro
-          loadHabits()
+          loadHabitsStatus(date)
         })
         return
       }
@@ -570,13 +723,16 @@ export function HabitTracker({ initialHabits, date, currentDate }: HabitTrackerP
   function handleTimeConfirm() {
     if (!selectedHabit || !timeValue) return
 
+    // ===== PASSO 1: CAPTURAR O VALOR DO INPUT (Imediato) =====
     const numericValue = parseFloat(timeValue)
     if (isNaN(numericValue) || numericValue <= 0) return
 
-    // AÇÃO 1: Lógica de Acúmulo (Soma)
-    // Pegar o valor atual acumulado
+    // Guardar referências necessárias antes de qualquer atualização
+    const habitId = selectedHabit.id
     const currentValue = selectedHabit.achieved_value || 0
     const currentUnit = selectedHabit.achieved_unit || selectedHabit.target_unit || 'minutos'
+    const targetUnit = selectedHabit.target_unit || 'minutos'
+    const targetValue = selectedHabit.target_value || 1
     
     // Converter tudo para minutos para calcular a soma corretamente
     let currentValueInMinutes = currentValue
@@ -593,57 +749,56 @@ export function HabitTracker({ initialHabits, date, currentDate }: HabitTrackerP
     const totalInMinutes = currentValueInMinutes + newValueInMinutes
     
     // Converter de volta para a unidade do hábito (ou manter a unidade digitada se for diferente)
-    const targetUnit = selectedHabit.target_unit || 'minutos'
     let finalValue: number
     let finalUnit: string
     
-    // Se a unidade digitada for diferente da unidade do hábito, usar a unidade digitada
-    // Caso contrário, usar a unidade do hábito
     if (timeUnit !== targetUnit) {
-      // Converter total para a unidade digitada
       finalValue = timeUnit === 'horas' ? totalInMinutes / 60 : totalInMinutes
       finalUnit = timeUnit
     } else {
-      // Usar a unidade do hábito
       finalValue = targetUnit === 'horas' ? totalInMinutes / 60 : totalInMinutes
       finalUnit = targetUnit
     }
 
-    // AÇÃO 3: UX de Conclusão
-    // Se finalValue >= targetValue, marque como completed: true
-    const targetValue = selectedHabit.target_value || 1
+    // Verificar se completou
     let comparisonTarget = targetValue
     if (targetUnit === 'horas') {
       comparisonTarget = targetValue * 60
     }
-    
     const isCompleted = totalInMinutes >= comparisonTarget
 
-    // Fechar dialog IMEDIATAMENTE
+    // ===== PASSO 2: ATUALIZAÇÃO IMEDIATA DO ESTADO (CRÍTICO - ANTES DE QUALQUER OUTRA OPERAÇÃO) =====
+    // FORÇAR atualização do estado LOCAL primeiro para que a UI atualize instantaneamente (0ms)
+    // Esta é a ÚNICA atualização que importa para a experiência visual do usuário
+    setHabitsStatus((prev) => {
+      const newStatus = {
+        ...prev,
+        [habitId]: {
+          completed: isCompleted,
+          achieved_value: finalValue,
+          achieved_unit: finalUnit,
+        }
+      }
+      // Forçar re-render imediato
+      return newStatus
+    })
+
+    // Tocar som de sucesso se completou o hábito
+    if (isCompleted) {
+      playSuccessSound()
+    }
+
+    // ===== PASSO 3: FECHAR O MODAL (Visual) =====
     setSelectedHabit(null)
     setTimeValue('')
 
-    // 1. Atualização Local Imediata (Optimistic UI)
-    setLocalHabits((prev) =>
-      prev.map((h) =>
-        h.id === selectedHabit.id
-          ? {
-              ...h,
-              achieved_value: finalValue,
-              achieved_unit: finalUnit,
-              completed: isCompleted,
-            }
-          : h
-      )
-    )
-
-    // 2. Envio em Background (Fire-and-Forget)
-    // CRÍTICO: Usa a prop `date` (string YYYY-MM-DD da URL), não "hoje"
-    // Isso garante que se estou olhando o dia 13, eu salvo no dia 13
-    toggleHabit(selectedHabit.id, date, finalValue, finalUnit).catch((error) => {
+    // ===== PASSO 4: ENVIO EM BACKGROUND (Só depois da atualização visual) =====
+    // PROIBIDO: Não usar router.refresh() ou window.location.reload() aqui
+    // Fire-and-Forget: Enviar para o servidor em background (não bloqueia a UI)
+    toggleHabit(habitId, date, finalValue, finalUnit).catch((error) => {
       console.error('Erro ao salvar progresso:', error)
-      // Reverter em caso de erro
-      loadHabits()
+      // Reverter em caso de erro (rollback do estado otimista)
+      loadHabitsStatus(date)
     })
   }
 
@@ -651,41 +806,50 @@ export function HabitTracker({ initialHabits, date, currentDate }: HabitTrackerP
   function handleTimeRestart() {
     if (!selectedHabit) return
 
-    // Fechar dialog IMEDIATAMENTE
-    setSelectedHabit(null)
-    setTimeValue('')
-
     // Usar a target_unit do hábito para manter consistência
     const targetUnit = selectedHabit.target_unit || 'minutos'
 
-    // 1. Atualização Local Imediata (Optimistic UI)
-    setLocalHabits((prev) =>
-      prev.map((h) =>
-        h.id === selectedHabit.id
-          ? {
-              ...h,
-              achieved_value: 0,
-              achieved_unit: null,
-              completed: false,
-            }
-          : h
-      )
-    )
+    // 1. Atualização Local Imediata (Optimistic UI) - Barra de progresso atualiza instantaneamente
+    setHabitsStatus((prev) => ({
+      ...prev,
+      [selectedHabit.id]: {
+        completed: false,
+        achieved_value: 0,
+        achieved_unit: null,
+      }
+    }))
 
-    // 2. Envio em Background (Fire-and-Forget)
+    // 2. Fechar dialog após atualizar estado (garante que a barra já está atualizada)
+    setSelectedHabit(null)
+    setTimeValue('')
+
+    // 3. Envio em Background (Fire-and-Forget) - Sem reload
     // Zerar o valor e marcar como não completado
     // Passamos 0 com a unidade do hábito para manter consistência no banco
     toggleHabit(selectedHabit.id, date, 0, targetUnit, false).catch((error) => {
       console.error('Erro ao reiniciar hábito:', error)
-      // Reverter em caso de erro
-      loadHabits()
+      // Reverter em caso de erro (rollback do estado otimista)
+      loadHabitsStatus(date)
     })
   }
 
   async function handleHabitCreated() {
     // AÇÃO 1: Recarregar hábitos imediatamente após criação
     // Isso garante que o hábito apareça na lista mesmo se o filtro de dias mudar
-    await loadHabits()
+    const result = await getHabits(date)
+    if (result.success && result.data) {
+      const newStructure = result.data.map(({ completed, achieved_value, achieved_unit, ...rest }) => rest as Habit)
+      const newStatus: Record<string, { completed: boolean; achieved_value: number | null; achieved_unit: string | null }> = {}
+      result.data.forEach(h => {
+        newStatus[h.id] = {
+          completed: h.completed ?? false,
+          achieved_value: h.achieved_value ?? null,
+          achieved_unit: h.achieved_unit ?? null,
+        }
+      })
+      setHabitsStructure(newStructure)
+      setHabitsStatus(newStatus)
+    }
   }
 
   // AÇÃO 3: Estabilizar funções com useCallback para componente memoizado
@@ -696,8 +860,13 @@ export function HabitTracker({ initialHabits, date, currentDate }: HabitTrackerP
   }, [])
 
   const handleDeleteStable = useCallback((habitId: string, habitTitle: string) => {
-    // 1. Atualização Visual Imediata (Optimistic UI)
-    setLocalHabits((prev) => prev.filter((h) => h.id !== habitId))
+    // 1. Atualização Visual Imediata (Optimistic UI) - Remover da estrutura
+    setHabitsStructure((prev) => prev.filter((h) => h.id !== habitId))
+    setHabitsStatus((prev) => {
+      const newStatus = { ...prev }
+      delete newStatus[habitId]
+      return newStatus
+    })
 
     // 2. Persistência em Background (Fire-and-Forget)
     deleteHabit(habitId)
@@ -725,30 +894,33 @@ export function HabitTracker({ initialHabits, date, currentDate }: HabitTrackerP
     const newValue = (habitData.goal_type === 'time' && !newStatus) ? 0 : undefined
     
     if (habitData.goal_type === 'check') {
-      setLocalHabits((prev) =>
-        prev.map((h) =>
-          h.id === id ? { ...h, completed: newStatus } : h
-        )
-      )
+      setHabitsStatus((prev) => ({
+        ...prev,
+        [id]: {
+          ...prev[id],
+          completed: newStatus,
+        }
+      }))
       toggleHabit(id, date, undefined, undefined, newStatus).catch((error) => {
         console.error('Erro ao atualizar hábito:', error)
-        loadHabits()
+        loadHabitsStatus(date)
       })
       return
     }
 
     if (habitData.goal_type === 'time') {
       if (completed) {
-        setLocalHabits((prev) =>
-          prev.map((h) =>
-            h.id === id
-              ? { ...h, completed: false, achieved_value: 0, achieved_unit: null }
-              : h
-          )
-        )
+        setHabitsStatus((prev) => ({
+          ...prev,
+          [id]: {
+            completed: false,
+            achieved_value: 0,
+            achieved_unit: null,
+          }
+        }))
         toggleHabit(id, date, 0, undefined, false).catch((error) => {
           console.error('Erro ao desmarcar hábito:', error)
-          loadHabits()
+          loadHabitsStatus(date)
         })
         return
       }
@@ -759,8 +931,13 @@ export function HabitTracker({ initialHabits, date, currentDate }: HabitTrackerP
   }, [date, localHabits]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleDeleteHabit(habitId: string, habitTitle: string) {
-    // 1. Atualização Visual Imediata (Optimistic UI)
-    setLocalHabits((prev) => prev.filter((h) => h.id !== habitId))
+    // 1. Atualização Visual Imediata (Optimistic UI) - Remover da estrutura
+    setHabitsStructure((prev) => prev.filter((h) => h.id !== habitId))
+    setHabitsStatus((prev) => {
+      const newStatus = { ...prev }
+      delete newStatus[habitId]
+      return newStatus
+    })
 
     // 2. Persistência em Background (Fire-and-Forget)
     deleteHabit(habitId)
@@ -782,47 +959,36 @@ export function HabitTracker({ initialHabits, date, currentDate }: HabitTrackerP
       })
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <p className="text-muted-foreground font-body">Carregando hábitos...</p>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
       {/* Cabeçalho com Botões de Ação */}
-      <div className="flex justify-center gap-4 mb-12">
+      <div className="flex justify-center gap-3 mb-10">
+        {/* Transplante: botão do Planner (mesmo JSX/classes), ligado ao modal de hábito */}
         <button
           onClick={() => {
             setEditingHabit(null)
             setDialogOpen(true)
           }}
-          className="px-6 py-3 border border-primary text-primary md:hover:bg-primary md:hover:text-primary-foreground active:bg-primary active:text-primary-foreground transition-all duration-300 font-heading uppercase tracking-widest text-sm touch-manipulation cursor-pointer"
+          className="px-6 py-5 bg-[#d4af37] text-black font-heading uppercase tracking-widest text-lg hover:bg-[#d4af37]/90 rounded-lg shadow-[0_0_20px_rgba(212,175,55,0.3)]"
         >
-          NOVO HÁBITO
+          + NOVO HÁBITO
         </button>
         <button
-          onClick={async () => {
-            // Buscar TODOS os hábitos quando abrir o organizador
-            const result = await getAllHabits()
-            if (result.success && result.data) {
-              // Converter Habit[] para HabitWithStatus[] (adicionar campos de status vazios)
-              const habitsWithStatus: HabitWithStatus[] = result.data.map((h) => ({
-                ...h,
-                completed: false,
-                achieved_value: null,
-                achieved_unit: null,
-              }))
-              setAllHabitsForReorder(habitsWithStatus)
-            }
+          onClick={() => {
+            // AÇÃO 2: Zero Fetch — usar o estado local já carregado
+            // Abrir organizador instantaneamente (apenas troca de boolean)
+            setAllHabitsForReorder(localHabits)
             setIsReorderOpen(true)
           }}
-          className="px-6 py-3 border border-border text-foreground md:hover:bg-muted/50 active:bg-muted/50 transition-all duration-300 font-heading uppercase tracking-widest text-sm flex items-center gap-2 touch-manipulation cursor-pointer"
+          className={cn(
+            'w-14 py-5 inline-flex items-center justify-center',
+            'bg-white/5 border border-white/10 hover:border-[#d4af37]/50 text-white',
+            'rounded-lg',
+            'touch-manipulation cursor-pointer'
+          )}
+          title="Organizar"
         >
-          <ArrowUpDown className="w-4 h-4" />
-          ORGANIZAR
+          <ArrowUpDown className="w-6 h-6" />
         </button>
       </div>
 
@@ -882,7 +1048,7 @@ export function HabitTracker({ initialHabits, date, currentDate }: HabitTrackerP
                     type="button"
                     onClick={() => setTimeUnit('minutos')}
                     className={cn(
-                      'px-4 py-2 h-10 border transition-all duration-300 font-heading uppercase tracking-widest text-xs touch-manipulation cursor-pointer',
+                      'px-4 py-2 h-10 border font-heading uppercase tracking-widest text-xs touch-manipulation cursor-pointer',
                       timeUnit === 'minutos'
                         ? 'border-[#E5C06E] bg-[#E5C06E] text-black font-bold'
                         : 'border-[#E5C06E]/30 bg-transparent text-white/60 md:hover:border-[#E5C06E]/50 md:hover:text-white/90 active:border-[#E5C06E]/50 active:text-white/90'
@@ -894,7 +1060,7 @@ export function HabitTracker({ initialHabits, date, currentDate }: HabitTrackerP
                     type="button"
                     onClick={() => setTimeUnit('horas')}
                     className={cn(
-                      'px-4 py-2 h-10 border transition-all duration-300 font-heading uppercase tracking-widest text-xs touch-manipulation cursor-pointer',
+                      'px-4 py-2 h-10 border font-heading uppercase tracking-widest text-xs touch-manipulation cursor-pointer',
                       timeUnit === 'horas'
                         ? 'border-[#E5C06E] bg-[#E5C06E] text-black font-bold'
                         : 'border-[#E5C06E]/30 bg-transparent text-white/60 md:hover:border-[#E5C06E]/50 md:hover:text-white/90 active:border-[#E5C06E]/50 active:text-white/90'
@@ -921,13 +1087,13 @@ export function HabitTracker({ initialHabits, date, currentDate }: HabitTrackerP
               <div className="flex gap-3">
                 <button
                   onClick={() => setSelectedHabit(null)}
-                  className="px-4 py-2 h-10 text-white/60 md:hover:text-white/90 active:text-white/90 transition-all duration-300 font-heading uppercase tracking-widest text-xs touch-manipulation cursor-pointer"
+                  className="px-4 py-2 h-10 text-white/60 md:hover:text-white/90 active:text-white/90 font-heading uppercase tracking-widest text-xs touch-manipulation cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleTimeConfirm}
-                  className="px-4 py-2 h-10 bg-[#E5C06E] text-black font-bold md:hover:shadow-[0_0_20px_rgba(229,192,110,0.6)] transition-all duration-300 font-heading uppercase tracking-widest text-xs touch-manipulation cursor-pointer"
+                  className="px-4 py-2 h-10 bg-[#E5C06E] text-black font-bold md:hover:shadow-[0_0_20px_rgba(229,192,110,0.6)] font-heading uppercase tracking-widest text-xs touch-manipulation cursor-pointer"
                 >
                   Salvar
                 </button>
@@ -939,12 +1105,15 @@ export function HabitTracker({ initialHabits, date, currentDate }: HabitTrackerP
 
       {/* As Tábuas - Lista de Hábitos (Estática) */}
       {/* AÇÃO 3: Isolamento Visual - Componente memoizado para evitar re-renders */}
-      <HabitsListMemoized
-        habits={sortedHabits}
-        onToggle={handleToggleStable}
-        onEdit={handleEditStable}
-        onDelete={handleDeleteStable}
-      />
+      {/* AÇÃO 4: Loading sutil - Opacidade reduzida nos checks enquanto carrega status */}
+      <div className={statusLoading ? 'opacity-60' : undefined}>
+        <HabitsListMemoized
+          habits={sortedHabits}
+          onToggle={handleToggleStable}
+          onEdit={handleEditStable}
+          onDelete={handleDeleteStable}
+        />
+      </div>
 
       {/* Dialog de Reordenação */}
       <HabitReorderDialog
@@ -958,7 +1127,9 @@ export function HabitTracker({ initialHabits, date, currentDate }: HabitTrackerP
         }}
         habits={allHabitsForReorder.length > 0 ? allHabitsForReorder : localHabits}
         onReorder={(newOrderedList) => {
-          // Atualização Otimista Imediata (0ms)
+          // Atualização Otimista Imediata (0ms) - Atualizar estrutura
+          const newStructure = newOrderedList.map(({ completed, achieved_value, achieved_unit, ...rest }) => rest as Habit)
+          setHabitsStructure(newStructure)
           setAllHabitsForReorder(newOrderedList)
         }}
         onEdit={(habit) => {

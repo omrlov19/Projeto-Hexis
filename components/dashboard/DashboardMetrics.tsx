@@ -8,7 +8,11 @@ interface DashboardMetricsProps {
   metrics: DashboardMetrics
 }
 
-// Componente de Círculo de Progresso (Anel SVG) - CORES HARDCODED
+// Escala dos anéis (discretos: w-20 = 80px)
+const RING_SIZE = 80
+const RING_RADIUS = 38
+
+// Componente de Círculo de Progresso (Anel SVG) - Escala reduzida para layout compacto
 function ProgressRing({
   value,
   max,
@@ -23,32 +27,35 @@ function ProgressRing({
   strokeColor?: string
 }) {
   const percentage = max > 0 ? Math.min((value / max) * 100, 100) : 0
-  const circumference = 2 * Math.PI * 45 // raio = 45
+  const circumference = 2 * Math.PI * RING_RADIUS
   const strokeDasharray = circumference
   const strokeDashoffset = circumference - (percentage / 100) * circumference
 
   return (
     <div className="flex flex-col items-center">
-      <div className="relative w-32 h-32">
-        <svg className="transform -rotate-90 w-32 h-32" viewBox="0 0 100 100">
-          {/* Círculo de fundo - Trilha CINZA VISÍVEL */}
+      <div className="relative" style={{ width: RING_SIZE, height: RING_SIZE }}>
+        <svg
+          className="transform -rotate-90"
+          width={RING_SIZE}
+          height={RING_SIZE}
+          viewBox="0 0 100 100"
+        >
           <circle
             cx="50"
             cy="50"
-            r="45"
+            r={RING_RADIUS}
             fill="none"
             stroke="#333333"
-            strokeWidth="8"
+            strokeWidth="6"
             strokeOpacity="1"
           />
-          {/* Círculo de progresso - COR HARDCODED */}
           <circle
             cx="50"
             cy="50"
-            r="45"
+            r={RING_RADIUS}
             fill="none"
             stroke={strokeColor}
-            strokeWidth="8"
+            strokeWidth="6"
             strokeDasharray={strokeDasharray}
             strokeDashoffset={strokeDashoffset}
             strokeLinecap="round"
@@ -56,23 +63,22 @@ function ProgressRing({
             className="transition-all duration-500"
           />
         </svg>
-        {/* Texto central - BRANCO PURO */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-4xl font-heading font-bold" style={{ color: '#ffffff' }}>
+          <span className="text-xl font-heading font-bold leading-none" style={{ color: '#ffffff' }}>
             {value}
           </span>
           {max > 0 && (
-            <span className="text-sm font-mono" style={{ color: '#ffffff' }}>
+            <span className="text-xs font-mono mt-0.5" style={{ color: '#ffffff' }}>
               /{max}
             </span>
           )}
         </div>
       </div>
-      <div className="mt-4 text-center">
-        <p className="text-sm font-serif uppercase tracking-wider" style={{ color: '#ffffff' }}>
+      <div className="mt-2 text-center">
+        <p className="text-xs font-serif uppercase tracking-wider" style={{ color: '#ffffff' }}>
           {label}
         </p>
-        <p className="text-xs mt-1" style={{ color: '#cccccc' }}>
+        <p className="text-[10px] mt-0.5" style={{ color: '#cccccc' }}>
           {subtitle}
         </p>
       </div>
@@ -107,84 +113,97 @@ export default function DashboardMetrics({ metrics }: DashboardMetricsProps) {
   const focusStrokeColor = '#ffffff' // Branco
   const levelStrokeColor = '#ff4444' // Vermelho
 
+  // Referência máxima para o anel de foco (8h = 480 min) para escala visual
+  const focusMaxMinutes = 480
+  const focusPercentage = Math.min(100, (today.focusMinutes / focusMaxMinutes) * 100)
+  const focusCircumference = 2 * Math.PI * RING_RADIUS
+  const focusStrokeDashoffset =
+    focusCircumference - (focusPercentage / 100) * focusCircumference
+
   return (
-    <div className="space-y-8 border border-red-500">
-      {/* A Trindade - Grid de 3 Círculos */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Círculo 1: HÁBITOS */}
+    <div className="space-y-6">
+      {/* Cards de métricas: lado a lado (flex-row, círculos pequenos) */}
+      <div className="flex flex-row justify-between items-center gap-4">
+        {/* Círculo 1: HÁBITOS — habitsCount/habitsTotal (barra = % real) */}
         <div
-          className="rounded-xl p-6"
+          className="rounded-xl p-3 flex flex-col items-center justify-center flex-1 min-w-0"
           style={{ backgroundColor: '#111111', border: '1px solid #333333' }}
         >
           <ProgressRing
-            value={today.completedHabits}
-            max={today.totalHabits}
+            value={today.completed}
+            max={today.total}
             label="HÁBITOS"
-            subtitle={`${today.productivityScore}% concluído`}
+            subtitle={`${today.score}% concluído`}
             strokeColor={habitStrokeColor}
           />
         </div>
 
-        {/* Círculo 2: FOCO */}
+        {/* Círculo 2: FOCO — focusMinutes */}
         <div
-          className="rounded-xl p-6"
+          className="rounded-xl p-3 flex flex-col items-center justify-center flex-1 min-w-0"
           style={{ backgroundColor: '#111111', border: '1px solid #333333' }}
         >
           <div className="flex flex-col items-center">
-            <div className="relative w-32 h-32">
-              <svg className="transform -rotate-90 w-32 h-32" viewBox="0 0 100 100">
-                {/* Trilha de fundo - CINZA VISÍVEL */}
+            <div className="relative" style={{ width: RING_SIZE, height: RING_SIZE }}>
+              <svg
+                className="transform -rotate-90"
+                width={RING_SIZE}
+                height={RING_SIZE}
+                viewBox="0 0 100 100"
+              >
                 <circle
                   cx="50"
                   cy="50"
-                  r="45"
+                  r={RING_RADIUS}
                   fill="none"
                   stroke="#333333"
-                  strokeWidth="8"
+                  strokeWidth="6"
                   strokeOpacity="1"
                 />
-                {/* Progresso - BRANCO */}
                 <circle
                   cx="50"
                   cy="50"
-                  r="45"
+                  r={RING_RADIUS}
                   fill="none"
                   stroke={focusStrokeColor}
-                  strokeWidth="8"
-                  strokeDasharray={2 * Math.PI * 45}
-                  strokeDashoffset={
-                    2 * Math.PI * 45 - ((today.focusMinutes / 480) * 100 * (2 * Math.PI * 45)) / 100
-                  }
+                  strokeWidth="6"
+                  strokeDasharray={focusCircumference}
+                  strokeDashoffset={focusStrokeDashoffset}
                   strokeLinecap="round"
                   strokeOpacity="1"
                   className="transition-all duration-500"
                 />
               </svg>
-              {/* Texto central - BRANCO PURO */}
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-3xl font-heading font-bold" style={{ color: '#ffffff' }}>
+                <span
+                  className="text-lg font-heading font-bold leading-none"
+                  style={{ color: '#ffffff' }}
+                >
                   {formatFocusTime(today.focusMinutes)}
                 </span>
               </div>
             </div>
-            <div className="mt-4 text-center">
-              <p className="text-sm font-serif uppercase tracking-wider" style={{ color: '#ffffff' }}>
+            <div className="mt-2 text-center">
+              <p
+                className="text-xs font-serif uppercase tracking-wider"
+                style={{ color: '#ffffff' }}
+              >
                 FOCO
               </p>
-              <p className="text-xs mt-1" style={{ color: '#cccccc' }}>
+              <p className="text-[10px] mt-0.5" style={{ color: '#cccccc' }}>
                 Tempo focado hoje
               </p>
             </div>
           </div>
         </div>
 
-        {/* Círculo 3: NÍVEL */}
+        {/* Círculo 3: NÍVEL — (habitsCount/habitsTotal)*100 */}
         <div
-          className="rounded-xl p-6"
+          className="rounded-xl p-3 flex flex-col items-center justify-center flex-1 min-w-0"
           style={{ backgroundColor: '#111111', border: '1px solid #333333' }}
         >
           <ProgressRing
-            value={today.productivityScore}
+            value={today.score}
             max={100}
             label="NÍVEL"
             subtitle="Produtividade"
@@ -193,9 +212,9 @@ export default function DashboardMetrics({ metrics }: DashboardMetricsProps) {
         </div>
       </div>
 
-      {/* O Gráfico de Desempenho */}
+      {/* Gráfico principal: abaixo das métricas, largura total */}
       <div
-        className="rounded-xl p-6"
+        className="rounded-xl p-4 sm:p-6 w-full"
         style={{ backgroundColor: '#111111', border: '1px solid #333333' }}
       >
         <h2

@@ -21,6 +21,7 @@ interface FocusContextType {
   stopFocus: () => void
   resetFocus: () => void
   togglePause: () => void // Nova função para pausar/retomar
+  completeFocusEarly: () => void // Nova função para concluir antecipadamente
   
   // Estado auxiliar
   isActive: boolean
@@ -176,6 +177,23 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     setPauseStartTime(null)
   }, [])
 
+  // Função para concluir o foco antecipadamente
+  const completeFocusEarly = useCallback(() => {
+    if (phase !== 'RUNNING') return
+    
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+    
+    // Calcular tempo decorrido para salvar corretamente
+    const elapsed = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0
+    
+    setDurationSeconds(elapsed) // Ajustar duração para o tempo real decorrido
+    setTimeLeft(0)
+    setPhase('SUCCESS') // Mudar para estado de sucesso
+  }, [phase, startTime])
+
   // Função para resetar completamente
   const resetFocus = useCallback(() => {
     stopFocus()
@@ -237,6 +255,7 @@ export function FocusProvider({ children }: { children: ReactNode }) {
     stopFocus,
     resetFocus,
     togglePause,
+    completeFocusEarly,
     isActive: phase === 'RUNNING',
     getElapsedTime,
     getProgress,

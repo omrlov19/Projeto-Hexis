@@ -153,17 +153,17 @@ export function HabitReorderDialog({
   const [items, setItems] = useState<HabitWithStatus[]>(habits)
   const prevOpenRef = useRef(false)
 
-  // Sensores para drag-and-drop
+  // Sensores para drag-and-drop (mobile: delay evita conflito com scroll/toque)
   const sensors = useSensors(
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 200, // Long press de 200ms
-        tolerance: 5, // Tolerância de movimento
+        delay: 250, // Long press 250ms — diferencia toque de scroll no celular
+        tolerance: 5,
       },
     }),
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8, // Movimento de 8px ativa o drag
+        distance: 8,
       },
     })
   )
