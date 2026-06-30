@@ -123,11 +123,12 @@ async function getDayTimelineData(
 
 interface PlannerClientProps {
   initialHabits: HabitWithStatus[]
+  initialReminders?: PlannerReminderRow[]
   /** Quando true, não renderiza o título (já exibido no shell da página). */
   hideHeader?: boolean
 }
 
-export default function PlannerClient({ initialHabits, hideHeader = false }: PlannerClientProps) {
+export default function PlannerClient({ initialHabits, initialReminders = [], hideHeader = false }: PlannerClientProps) {
   // Estabilizar 'today' para evitar recálculos desnecessários
   const today = useMemo(() => getBrasiliaDate(), [])
   
@@ -202,12 +203,22 @@ export default function PlannerClient({ initialHabits, hideHeader = false }: Pla
   }, [])
 
   // Estado para lembretes — fonte de verdade: Supabase
-  const [reminders, setReminders] = useState<Reminder[]>([])
+  const [reminders, setReminders] = useState<Reminder[]>(() =>
+    (initialReminders ?? []).map(rowToReminder)
+  )
   const [newReminderText, setNewReminderText] = useState('')
   const [newReminderTime, setNewReminderTime] = useState<string>('')
   const [newReminderDate, setNewReminderDate] = useState<Date | null>(null) // Data selecionada para o lembrete
 
-  // Carregar lembretes do Supabase na inicialização
+  // Sincronizar initialReminders quando mudar
+  useEffect(() => {
+    if (initialReminders && initialReminders.length > 0) {
+      setReminders(initialReminders.map(rowToReminder))
+      setRefreshTrigger((prev) => prev + 1)
+    }
+  }, [initialReminders])
+
+  // Carregar lembretes do Supabase na inicialização para garantir sincronização final
   useEffect(() => {
     let cancelled = false
     getReminders().then((result) => {

@@ -181,13 +181,13 @@ export function UserProfileModal(props: UserProfileModalProps) {
           </div>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div className="bg-zinc-900/50 rounded-2xl p-4 border border-zinc-800/50">
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="bg-zinc-900/50 rounded-2xl p-4 border border-zinc-800/50 min-w-0">
             <p className="text-xs uppercase text-zinc-500 font-bold tracking-wider mb-1">Email</p>
             <p className="text-sm font-medium text-zinc-200 truncate" title={props.email || ''}>{props.email || 'Não informado'}</p>
           </div>
           
-          <div className="bg-zinc-900/50 rounded-2xl p-4 border border-zinc-800/50">
+          <div className="bg-zinc-900/50 rounded-2xl p-4 border border-zinc-800/50 min-w-0">
             <p className="text-xs uppercase text-zinc-500 font-bold tracking-wider mb-1">Número</p>
             {isEditing ? (
               <input
@@ -198,20 +198,21 @@ export function UserProfileModal(props: UserProfileModalProps) {
                 className="w-full bg-black/50 border border-zinc-700 rounded-md px-2 py-1 text-sm text-white focus:outline-none focus:border-[#d4af37]"
               />
             ) : (
-              <p className="text-sm font-medium text-zinc-200">{phone || props.phone || 'Não informado'}</p>
+              <p className="text-sm font-medium text-zinc-200 truncate">{phone || props.phone || 'Não informado'}</p>
             )}
           </div>
           
-          <div className="bg-zinc-900/50 rounded-2xl p-4 border border-[#d4af37]/20 relative overflow-hidden md:col-span-2 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="bg-zinc-900/50 rounded-2xl p-4 border border-[#d4af37]/20 relative overflow-hidden col-span-2 flex flex-row items-center justify-between gap-4">
             <div className="absolute top-0 right-0 w-32 h-32 bg-[#d4af37]/10 blur-3xl rounded-full pointer-events-none" />
-            <div>
+            <div className="min-w-0">
               <p className="text-xs uppercase text-[#d4af37]/70 font-bold tracking-wider mb-1">Plano Atual</p>
-              <p className="text-lg font-heading font-black text-white uppercase tracking-wide">GRATUITO</p>
+              <p className="text-lg sm:text-xl font-heading font-black text-white uppercase tracking-wide truncate">GRATUITO</p>
             </div>
             
-            <button className="w-full sm:w-auto px-6 py-2 bg-[#d4af37] text-black rounded-lg font-heading font-bold uppercase tracking-wider text-sm hover:bg-[#c4a030] transition-colors flex items-center justify-center gap-2 z-10">
+            <button className="w-auto px-4 sm:px-6 py-2 bg-[#d4af37] text-black rounded-lg font-heading font-bold uppercase tracking-wider text-xs sm:text-sm hover:bg-[#c4a030] transition-colors flex items-center justify-center gap-2 z-10 flex-shrink-0">
               <CreditCard className="w-4 h-4" />
-              Ver Planos
+              <span className="hidden sm:inline">Ver Planos</span>
+              <span className="sm:hidden">Planos</span>
             </button>
           </div>
         </div>
@@ -222,7 +223,7 @@ export function UserProfileModal(props: UserProfileModalProps) {
               <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center text-green-500 group-hover:bg-green-500 group-hover:text-black transition-colors">
                 <MessageCircle className="w-4 h-4" />
               </div>
-              <span className="font-medium text-zinc-200">Grupo VIP no WhatsApp</span>
+              <span className="font-medium text-zinc-200">Comunidade no WhatsApp</span>
             </div>
             <ChevronRight className="w-4 h-4 text-zinc-500 group-hover:text-green-500" />
           </a>

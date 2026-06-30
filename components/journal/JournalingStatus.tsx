@@ -15,7 +15,7 @@ export function JournalingStatus({ hasJournaledToday }: JournalingStatusProps) {
     <button
       type="button"
       onClick={() => !isDone && router.push('/journal')}
-      className="flex flex-col items-center justify-center rounded-3xl bg-zinc-900 border-2 border-zinc-700 p-6 min-h-[160px] w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 hover:border-zinc-600 transition-colors cursor-pointer"
+      className="flex flex-col items-center justify-center rounded-3xl bg-zinc-900 border-2 border-zinc-700 p-6 min-h-[160px] w-full h-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 hover:border-zinc-600 transition-colors cursor-pointer"
       aria-label={isDone ? 'Journaling do dia concluído' : 'Abrir Journaling'}
       title={isDone ? 'Journaling do dia concluído' : 'Fazer journaling do dia'}
     >

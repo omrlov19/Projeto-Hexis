@@ -16,7 +16,7 @@ export function MembersArea() {
       <DialogTrigger asChild>
         <button
           type="button"
-          className="flex flex-col items-center justify-center rounded-3xl bg-zinc-900 border-2 border-zinc-700 p-6 min-h-[160px] w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 hover:border-[#D4AF37]/40 transition-colors cursor-pointer"
+          className="flex flex-col items-center justify-center rounded-3xl bg-zinc-900 border-2 border-zinc-700 p-6 min-h-[160px] w-full h-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 hover:border-[#D4AF37]/40 transition-colors cursor-pointer"
           aria-label="Abrir Área de Membros"
         >
           <div className="w-20 h-20 rounded-full border-2 border-[#D4AF37]/50 flex items-center justify-center mb-3 flex-shrink-0 bg-zinc-800">

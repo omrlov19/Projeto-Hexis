@@ -14,6 +14,7 @@ export default function PlannerClientLoader() {
   const dateString = dateParam ?? formatBrasiliaDate(today)
 
   const [items, setItems] = useState<HabitWithStatus[]>([])
+  const [reminders, setReminders] = useState<any[]>([])
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -21,7 +22,7 @@ export default function PlannerClientLoader() {
     setError(null)
     fetch(`/api/planner?date=${encodeURIComponent(dateString)}`)
       .then((res) => {
-        if (cancelled) return
+        if (cancelled) return null
         if (res.status === 401) {
           router.push('/login')
           return null
@@ -33,6 +34,9 @@ export default function PlannerClientLoader() {
         if (cancelled || !data) return
         if (data.success && Array.isArray(data.items)) {
           setItems(data.items)
+          if (Array.isArray(data.reminders)) {
+            setReminders(data.reminders)
+          }
         } else {
           setError(data.error ?? 'Erro ao carregar')
         }
@@ -51,7 +55,7 @@ export default function PlannerClientLoader() {
           {error}
         </p>
       )}
-      <PlannerClient initialHabits={items} hideHeader />
+      <PlannerClient initialHabits={items} initialReminders={reminders} hideHeader />
     </div>
   )
 }

@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LayoutGrid, CheckSquare, Eye, Calendar, BookOpen } from 'lucide-react'
@@ -35,6 +36,11 @@ const navItems = [
 
 export function BottomNav() {
   const pathname = usePathname()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Ocultar na tela de login e cadastro
   if (pathname === '/login' || pathname === '/signup' || pathname.startsWith('/login') || pathname.startsWith('/signup')) {
@@ -51,11 +57,13 @@ export function BottomNav() {
     return pathname.startsWith(href)
   }
 
+  if (!mounted) return null
+
   return (
     <nav 
-      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[40] w-[90%] max-w-[350px] lg:max-w-[500px] h-16 rounded-2xl bg-[#0a0a0c]/90 backdrop-blur-md border border-[#d4af37] shadow-[0_4px_20px_rgba(212,175,55,0.3)] pointer-events-none"
+      className="fixed bottom-6 lg:bottom-8 left-0 right-0 mx-auto z-[999] w-[90%] max-w-[280px] lg:max-w-[500px] h-14 lg:h-16 rounded-2xl bg-[#0a0a0c] border border-[#d4af37] shadow-[0_4px_20px_rgba(212,175,55,0.4)]"
     >
-      <div className="flex items-center justify-around lg:justify-center lg:gap-x-12 px-2 lg:px-4 h-full py-0">
+      <div className="flex items-center justify-around lg:justify-center lg:gap-x-12 px-1 lg:px-4 h-full py-0">
         
         {navItems.map((item) => {
           const Icon = item.icon
@@ -67,16 +75,16 @@ export function BottomNav() {
               href={item.href}
               prefetch={true}
               className={cn(
-                'flex items-center transition-all duration-300 touch-manipulation cursor-pointer relative pointer-events-auto',
-                'flex-col justify-center px-3 py-2 lg:px-2 lg:py-0 rounded-lg hover:scale-110 active:scale-95'
+                'flex items-center transition-all duration-300 touch-manipulation cursor-pointer relative',
+                'flex-col justify-center px-2 py-1 lg:px-2 lg:py-0 rounded-lg hover:scale-110 active:scale-95'
               )}
             >
               <Icon
                 className={cn(
                   'transition-all duration-300',
                   item.href === '/blocker' 
-                    ? 'w-7 h-7 lg:w-10 lg:h-10' // Ícone do olho maior no desktop
-                    : 'w-7 h-7 lg:w-8 lg:h-8',  // Tamanho normal
+                    ? 'w-8 h-8 lg:w-10 lg:h-10' // Ícone do olho maior no mobile e desktop
+                    : 'w-6 h-6 lg:w-8 lg:h-8',  // Tamanho normal no mobile
                   isActive
                     ? 'text-[#d4af37] drop-shadow-[0_0_8px_rgba(212,175,55,0.4)]'
                     : 'text-stone-600'

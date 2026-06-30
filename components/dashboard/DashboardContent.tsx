@@ -199,182 +199,183 @@ export default function DashboardContent({ userName: initialUserName = '', consi
         <p className="text-center text-[#D4AF37] text-sm">{error}</p>
       )}
 
-      {/* Grid de Métricas (Hero) — 2 colunas */}
-      <div className="grid grid-cols-2 gap-4 relative">
-        {openPopover && (
-          <button
-            type="button"
-            aria-label="Fechar"
-            className="fixed inset-0 z-40 bg-black/40"
-            onClick={() => setOpenPopover(null)}
-          />
-        )}
-
-        {/* Card 1 — Contraste inteligente: duas camadas (fundo escuro+branco / frente dourada+preto) */}
-        <div className="relative">
-          <button
-            type="button"
-            className="relative w-full text-left rounded-3xl min-h-[160px] lg:min-h-[170px] focus:outline-none focus-visible:ring-2 focus-visible:ring-black/30 overflow-hidden"
-            onClick={() => setOpenPopover(openPopover === 'habits' ? null : 'habits')}
-          >
-            {/* Camada 1 (Back): fundo escuro, texto branco — sempre visível */}
-            <div className="absolute inset-0 w-full h-full rounded-3xl bg-slate-900 flex flex-col justify-between p-6 z-10">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-black text-white uppercase tracking-wide">
-                  Hábitos Concluídos
-                </span>
-                <Check className="w-6 h-6 text-white flex-shrink-0" strokeWidth={2.5} />
-              </div>
-              <p className="text-3xl sm:text-4xl font-heading font-black text-white mt-2">
-                {completed}/{total}
-              </p>
-            </div>
-            {/* Camada 2 (Front): dourado, w-full + clip-path — texto estático e alinhado ao fundo */}
-            <div
-              className="absolute inset-0 w-full h-full rounded-3xl bg-[#D4AF37] flex flex-col justify-between p-6 z-20"
-              style={{
-                clipPath: `inset(0 ${100 - habitProgress}% 0 0)`,
-                transition: 'clip-path 0.5s ease-out',
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-black text-slate-950 uppercase tracking-wide">
-                  Hábitos Concluídos
-                </span>
-                <Check className="w-6 h-6 text-slate-950 flex-shrink-0" strokeWidth={2.5} />
-              </div>
-              <p className="text-3xl sm:text-4xl font-heading font-black text-slate-950 mt-2">
-                {completed}/{total}
-              </p>
-            </div>
-          </button>
-          {openPopover === 'habits' && (
-            <div
-              className="absolute left-0 right-0 top-full z-50 mt-2 rounded-xl bg-zinc-900 border border-zinc-600 px-4 py-3 shadow-xl"
-              role="tooltip"
-            >
-              <p className="text-sm text-zinc-200 leading-snug">
-                {CARD_EXPLANATIONS.habits}
-              </p>
-            </div>
+      {/* 
+        Container Principal
+        Grid unificado com controle de order por CSS:
+        - Hero (Hábitos/Foco): col-span-2 lg:col-span-4 (order-1)
+        - Performance: col-span-2 lg:col-span-2 (order-2)
+        - Steve Jobs: col-span-1 (order-3 lg:order-4)
+        - Frequência (Goals): col-span-1 (order-3 lg:order-4)
+        - Journaling: col-span-1 (order-4 lg:order-4)
+        - Área de Membros: col-span-1 (order-4 lg:order-4)
+        - Consistência: col-span-2 lg:col-span-2 (order-5 lg:order-3)
+      */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 items-stretch relative pb-24">
+        
+        {/* 1. HERO (Hábitos e Foco) */}
+        <div className="col-span-2 lg:col-span-4 grid grid-cols-2 gap-4 order-1">
+          {openPopover && (
+            <button
+              type="button"
+              aria-label="Fechar"
+              className="fixed inset-0 z-40 bg-black/40"
+              onClick={() => setOpenPopover(null)}
+            />
           )}
+
+          {/* Card 1 — Hábitos */}
+          <div className="relative">
+            <button
+              type="button"
+              className="relative w-full text-left rounded-3xl min-h-[160px] lg:min-h-[170px] focus:outline-none focus-visible:ring-2 focus-visible:ring-black/30 overflow-hidden"
+              onClick={() => setOpenPopover(openPopover === 'habits' ? null : 'habits')}
+            >
+              <div className="absolute inset-0 w-full h-full rounded-3xl bg-slate-900 flex flex-col justify-between p-6 z-10">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-black text-white uppercase tracking-wide">
+                    Hábitos Concluídos
+                  </span>
+                  <Check className="w-6 h-6 text-white flex-shrink-0" strokeWidth={2.5} />
+                </div>
+                <p className="text-3xl sm:text-4xl font-heading font-black text-white mt-2">
+                  {completed}/{total}
+                </p>
+              </div>
+              <div
+                className="absolute inset-0 w-full h-full rounded-3xl bg-[#D4AF37] flex flex-col justify-between p-6 z-20"
+                style={{
+                  clipPath: `inset(0 ${100 - habitProgress}% 0 0)`,
+                  transition: 'clip-path 0.5s ease-out',
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-black text-slate-950 uppercase tracking-wide">
+                    Hábitos Concluídos
+                  </span>
+                  <Check className="w-6 h-6 text-slate-950 flex-shrink-0" strokeWidth={2.5} />
+                </div>
+                <p className="text-3xl sm:text-4xl font-heading font-black text-slate-950 mt-2">
+                  {completed}/{total}
+                </p>
+              </div>
+            </button>
+            {openPopover === 'habits' && (
+              <div className="absolute left-0 right-0 top-full z-50 mt-2 rounded-xl bg-zinc-900 border border-zinc-600 px-4 py-3 shadow-xl">
+                <p className="text-sm text-zinc-200 leading-snug">{CARD_EXPLANATIONS.habits}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Card 2 — Foco */}
+          <div className="relative">
+            <button
+              type="button"
+              className="relative w-full text-left rounded-3xl min-h-[160px] lg:min-h-[170px] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 overflow-hidden border border-zinc-700"
+              onClick={() => setOpenPopover(openPopover === 'focus' ? null : 'focus')}
+            >
+              <div className="absolute inset-0 w-full h-full rounded-3xl bg-slate-900 flex flex-col justify-between p-6 z-10">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-black text-white uppercase tracking-wide">
+                    Tempo de Foco
+                  </span>
+                  <Clock className="w-6 h-6 text-white flex-shrink-0" strokeWidth={2} />
+                </div>
+                <p className="text-3xl sm:text-4xl font-heading font-black text-white mt-2">
+                  {focusLabel}
+                  {displayGoals?.dailyFocusGoal != null && displayGoals.dailyFocusGoal > 0 && (
+                    <span className="block text-sm font-bold text-white/90 mt-1">
+                      (Meta {Math.round(displayGoals.dailyFocusGoal / 60)}h)
+                    </span>
+                  )}
+                </p>
+              </div>
+              <div
+                className="absolute inset-0 w-full h-full rounded-3xl bg-[#D4AF37] flex flex-col justify-between p-6 z-20"
+                style={{
+                  clipPath: `inset(0 ${100 - focusProgress}% 0 0)`,
+                  transition: 'clip-path 0.5s ease-out',
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-black text-slate-950 uppercase tracking-wide">
+                    Tempo de Foco
+                  </span>
+                  <Clock className="w-6 h-6 text-slate-950 flex-shrink-0" strokeWidth={2} />
+                </div>
+                <p className="text-3xl sm:text-4xl font-heading font-black text-slate-950 mt-2">
+                  {focusLabel}
+                  {displayGoals?.dailyFocusGoal != null && displayGoals.dailyFocusGoal > 0 && (
+                    <span className="block text-sm font-bold text-slate-800 mt-1">
+                      (Meta {Math.round(displayGoals.dailyFocusGoal / 60)}h)
+                    </span>
+                  )}
+                </p>
+              </div>
+            </button>
+            {openPopover === 'focus' && (
+              <div className="absolute left-0 right-0 top-full z-50 mt-2 rounded-xl bg-zinc-900 border border-zinc-600 px-4 py-3 shadow-xl">
+                <p className="text-sm text-zinc-200 leading-snug">{CARD_EXPLANATIONS.focus}</p>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Card 2 — Contraste inteligente: duas camadas (fundo escuro+branco / frente dourada+preto) */}
-        <div className="relative">
+        {/* 2. PERFORMANCE DE HOJE */}
+        <div className="col-span-2 lg:col-span-2 order-2 relative">
           <button
             type="button"
-            className="relative w-full text-left rounded-3xl min-h-[160px] lg:min-h-[170px] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 overflow-hidden border border-zinc-700"
-            onClick={() => setOpenPopover(openPopover === 'focus' ? null : 'focus')}
+            className="w-full h-full text-left rounded-3xl bg-zinc-900 border border-zinc-700 p-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 lg:min-h-[160px] flex flex-col justify-between"
+            onClick={() => setOpenPopover(openPopover === 'productivity' ? null : 'productivity')}
           >
-            {/* Camada 1 (Back): fundo escuro, texto branco — sempre visível */}
-            <div className="absolute inset-0 w-full h-full rounded-3xl bg-slate-900 flex flex-col justify-between p-6 z-10">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-black text-white uppercase tracking-wide">
-                  Tempo de Foco
+            {/* Desktop Layout (Grande) */}
+            <div className="hidden lg:flex flex-col h-full w-full justify-between">
+              <div className="flex items-center justify-between w-full">
+                <span className="text-sm font-medium text-white uppercase tracking-wide flex items-center gap-2">
+                  <Trophy className="w-4 h-4" />
+                  PERFORMANCE DE HOJE
                 </span>
-                <Clock className="w-6 h-6 text-white flex-shrink-0" strokeWidth={2} />
               </div>
-              <p className="text-3xl sm:text-4xl font-heading font-black text-white mt-2">
-                {focusLabel}
-                {displayGoals?.dailyFocusGoal != null && displayGoals.dailyFocusGoal > 0 && (
-                  <span className="block text-sm font-bold text-white/90 mt-1">
-                    (Meta de foco {Math.round(displayGoals.dailyFocusGoal / 60)}h)
-                  </span>
-                )}
-              </p>
-            </div>
-            {/* Camada 2 (Front): dourado, w-full + clip-path — texto estático e alinhado ao fundo */}
-            <div
-              className="absolute inset-0 w-full h-full rounded-3xl bg-[#D4AF37] flex flex-col justify-between p-6 z-20"
-              style={{
-                clipPath: `inset(0 ${100 - focusProgress}% 0 0)`,
-                transition: 'clip-path 0.5s ease-out',
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-black text-slate-950 uppercase tracking-wide">
-                  Tempo de Foco
+              <div className="flex-1 flex items-center justify-start py-8">
+                <span className="text-6xl font-heading font-black text-[#D4AF37]">
+                  {level}%
                 </span>
-                <Clock className="w-6 h-6 text-slate-950 flex-shrink-0" strokeWidth={2} />
               </div>
-              <p className="text-3xl sm:text-4xl font-heading font-black text-slate-950 mt-2">
-                {focusLabel}
-                {displayGoals?.dailyFocusGoal != null && displayGoals.dailyFocusGoal > 0 && (
-                  <span className="block text-sm font-bold text-slate-800 mt-1">
-                    (Meta de foco {Math.round(displayGoals.dailyFocusGoal / 60)}h)
-                  </span>
-                )}
-              </p>
-            </div>
-          </button>
-          {openPopover === 'focus' && (
-            <div
-              className="absolute left-0 right-0 top-full z-50 mt-2 rounded-xl bg-zinc-900 border border-zinc-600 px-4 py-3 shadow-xl"
-              role="tooltip"
-            >
-              <p className="text-sm text-zinc-200 leading-snug">
-                {CARD_EXPLANATIONS.focus}
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Middle Grid: Performance e Consistência */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
-        {/* Card de Produtividade */}
-        <div className="relative">
-          <button
-            type="button"
-            className="w-full h-full flex flex-col justify-between text-left rounded-3xl bg-zinc-900 border border-zinc-700 p-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50"
-            onClick={() =>
-              setOpenPopover(openPopover === 'productivity' ? null : 'productivity')
-            }
-          >
-            {/* Topo: Título */}
-            <div className="flex items-center justify-between w-full">
-              <span className="text-sm font-medium text-white uppercase tracking-wide flex items-center gap-2">
-                <Trophy className="w-4 h-4" />
-                PERFORMANCE DE HOJE
-              </span>
-            </div>
-
-            {/* Centro: Porcentagem Grande (Agora menor e à esquerda) */}
-            <div className="flex-1 flex items-center justify-start py-8">
-              <span className="text-5xl lg:text-6xl font-heading font-black text-[#D4AF37]">
-                {level}%
-              </span>
-            </div>
-
-            {/* Base: Barra de Progresso */}
-            <div className="w-full">
-              <div className="h-4 rounded-full bg-zinc-800 overflow-hidden mb-3">
-                <div
-                  className="h-full rounded-full bg-[#D4AF37] transition-all duration-1000 ease-out"
-                  style={{ width: `${Math.min(100, level)}%` }}
-                />
+              <div className="w-full">
+                <div className="h-4 rounded-full bg-zinc-800 overflow-hidden mb-3">
+                  <div className="h-full rounded-full bg-[#D4AF37] transition-all duration-1000 ease-out" style={{ width: `${Math.min(100, level)}%` }} />
+                </div>
+                <p className="text-xs text-zinc-500 text-center uppercase tracking-widest font-heading">
+                  Taxa de Hábitos Concluídos
+                </p>
               </div>
-              <p className="text-xs text-zinc-500 text-center uppercase tracking-widest font-heading">
-                Taxa de Hábitos Concluídos
-              </p>
+            </div>
+
+            {/* Mobile Layout (Compacto, horizontal) */}
+            <div className="flex lg:hidden flex-col w-full gap-4">
+              <div className="flex items-center justify-between w-full">
+                <span className="text-sm font-medium text-white uppercase tracking-wide flex items-center gap-2">
+                  <Trophy className="w-4 h-4" />
+                  PERFORMANCE DE HOJE
+                </span>
+                <span className="text-xl font-heading font-black text-[#D4AF37]">
+                  {level}%
+                </span>
+              </div>
+              <div className="w-full">
+                <div className="h-3 rounded-full bg-zinc-800 overflow-hidden">
+                  <div className="h-full rounded-full bg-[#D4AF37] transition-all duration-1000 ease-out" style={{ width: `${Math.min(100, level)}%` }} />
+                </div>
+              </div>
             </div>
           </button>
           {openPopover === 'productivity' && (
-            <div
-              className="absolute left-0 right-0 top-full z-50 mt-2 rounded-xl bg-zinc-900 border border-zinc-600 px-4 py-3 shadow-xl max-w-sm"
-              role="tooltip"
-            >
+            <div className="absolute left-0 right-0 top-full z-50 mt-2 rounded-xl bg-zinc-900 border border-zinc-600 px-4 py-3 shadow-xl max-w-sm">
               <h3 className="text-sm font-bold text-white uppercase tracking-wide mb-2">
                 COMO SUA PERFORMANCE É CALCULADA?
               </h3>
               <div className="text-sm text-zinc-200 leading-snug space-y-2">
-                <p>
-                  Sua performance diária (0-100%) é a taxa de hábitos concluídos no dia.
-                </p>
-                <p>
-                  <strong>Fórmula:</strong> (Concluídos ÷ Total) × 100
-                </p>
+                <p>Sua performance diária (0-100%) é a taxa de hábitos concluídos no dia.</p>
+                <p><strong>Fórmula:</strong> (Concluídos ÷ Total) × 100</p>
                 <p className="pt-1 border-t border-zinc-600 mt-2">
                   O valor é idêntico ao último ponto do gráfico de Consistência.
                 </p>
@@ -383,26 +384,39 @@ export default function DashboardContent({ userName: initialUserName = '', consi
           )}
         </div>
 
-        {/* Gráfico de Consistência */}
-        {consistencySection}
-      </div>
+        {/* 3. CONSISTÊNCIA */}
+        <div className="col-span-2 lg:col-span-2 order-5 lg:order-3">
+          {consistencySection}
+        </div>
 
-      {/* Grid Inferior: 4 colunas no Desktop */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
-        <SteveJobsSystem onOpenModal={() => setIsGoalsModalOpen(true)} />
-        <GoalsHotbar
-          goals={displayGoals}
-          onEdit={() => setIsGoalsModalOpen(true)}
-          onOptimisticToggle={(index, done) => {
-            if (!displayGoals) return
-            const prio = [...(displayGoals.weeklyPriorities ?? [])]
-            while (prio.length < 5) prio.push({ text: '', done: false })
-            prio[index] = { ...prio[index], done }
-            handleOptimisticUpdate({ ...displayGoals, weeklyPriorities: prio })
-          }}
-        />
-        <JournalingStatus hasJournaledToday={hasJournaledToday} />
-        <MembersArea />
+        {/* 4. HOTBARS INFERIORES: Linha 1 no Mobile (Steve Jobs + Frequencia) */}
+        <div className="col-span-1 lg:col-span-1 order-3 lg:order-4">
+          <SteveJobsSystem onOpenModal={() => setIsGoalsModalOpen(true)} />
+        </div>
+        
+        <div className="col-span-1 lg:col-span-1 order-3 lg:order-4">
+          <GoalsHotbar
+            goals={displayGoals}
+            onEdit={() => setIsGoalsModalOpen(true)}
+            onOptimisticToggle={(index, done) => {
+              if (!displayGoals) return
+              const prio = [...(displayGoals.weeklyPriorities ?? [])]
+              while (prio.length < 5) prio.push({ text: '', done: false })
+              prio[index] = { ...prio[index], done }
+              handleOptimisticUpdate({ ...displayGoals, weeklyPriorities: prio })
+            }}
+          />
+        </div>
+        
+        {/* Linha 2 no Mobile (Journaling + Membros) */}
+        <div className="col-span-1 lg:col-span-1 order-4 lg:order-4">
+          <JournalingStatus hasJournaledToday={hasJournaledToday} />
+        </div>
+        
+        <div className="col-span-1 lg:col-span-1 order-4 lg:order-4">
+          <MembersArea />
+        </div>
+
       </div>
 
       <GoalsDialog

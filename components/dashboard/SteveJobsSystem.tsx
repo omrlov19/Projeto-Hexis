@@ -13,7 +13,7 @@ export function SteveJobsSystem({ onOpenModal }: SteveJobsSystemProps) {
     <button
       type="button"
       onClick={onOpenModal}
-      className="flex flex-col items-center justify-center rounded-3xl bg-zinc-900 border-2 border-[#D4AF37] p-6 min-h-[160px] w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 hover:shadow-[0_0_20px_rgba(212,175,55,0.25)] transition-colors"
+      className="flex flex-col items-center justify-center rounded-3xl bg-zinc-900 border-2 border-[#D4AF37] p-6 min-h-[160px] w-full h-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 hover:shadow-[0_0_20px_rgba(212,175,55,0.25)] transition-colors"
       aria-label="Abrir Sistema Steve Jobs"
     >
       <div className="w-20 h-20 rounded-full border-2 border-[#D4AF37]/50 overflow-hidden flex items-center justify-center mb-3 flex-shrink-0 bg-zinc-800">

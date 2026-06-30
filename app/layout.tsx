@@ -47,14 +47,14 @@ export default function RootLayout({
     <html lang="pt-BR" className="dark" suppressHydrationWarning>
       <body className={`${cinzel.variable} ${cormorantGaramond.variable} font-body bg-black text-white`} suppressHydrationWarning>
         <FocusProvider>
-          {/* Menu de navegação responsivo (Bottom no mobile, Sidebar no desktop) */}
-          <BottomNav />
-          
           {/* Main App Container */}
           <main className="w-full min-h-screen bg-black transition-all duration-300">
             {children}
             <FloatingTimer />
           </main>
+          
+          {/* Menu de navegação responsivo (Bottom no mobile, Sidebar no desktop) */}
+          <BottomNav />
           
           <Toaster theme="dark" richColors position="top-center" />
         </FocusProvider>

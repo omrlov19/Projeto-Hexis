@@ -111,7 +111,7 @@ export function GoalsHotbar({ goals, onEdit, onOptimisticToggle }: GoalsHotbarPr
   }
 
   return (
-    <div className="rounded-3xl bg-zinc-900 border-2 border-zinc-700 p-4 min-h-[160px] flex flex-col">
+    <div className="rounded-3xl bg-zinc-900 border-2 border-zinc-700 p-4 min-h-[160px] h-full flex flex-col">
       <div className="flex items-center justify-between gap-2 mb-3">
         <h2 className="text-sm font-medium text-[#D4AF37] uppercase tracking-wide">
           FREQUÊNCIA DA SEMANA
