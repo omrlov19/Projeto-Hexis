@@ -633,7 +633,7 @@ export default function PlannerClient({ initialHabits, hideHeader = false }: Pla
                     setNewReminderDate(null)
                   }
                 }}
-                className="w-full px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-[#d4af37]/50 transition-colors"
+                className="w-full min-w-0 max-w-full block px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-[#d4af37]/50 transition-colors"
               />
             </div>
             <div>
@@ -644,7 +644,7 @@ export default function PlannerClient({ initialHabits, hideHeader = false }: Pla
                 type="time"
                 value={newReminderTime}
                 onChange={(e) => setNewReminderTime(e.target.value)}
-                className="w-full px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-[#d4af37]/50 transition-colors"
+                className="w-full min-w-0 max-w-full block px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-[#d4af37]/50 transition-colors"
               />
             </div>
             <div className="flex gap-3 pt-4">
