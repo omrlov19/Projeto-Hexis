@@ -14,6 +14,10 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog'
+import { IconHotbar } from './IconHotbar'
+import { TimePickerHotbar } from '@/components/ui/TimePickerHotbar'
+import { DurationPickerHotbar } from '@/components/ui/DurationPickerHotbar'
+import { IconPickerPopover } from '@/components/ui/IconPickerPopover'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -44,6 +48,8 @@ import {
   ArrowLeft,
   X,
   Loader2,
+  ChevronUp,
+  ChevronDown,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -147,9 +153,10 @@ export function CreateHabitDialog({
   const [hasTimeGoal, setHasTimeGoal] = useState(false)
   const [timeMinutes, setTimeMinutes] = useState<string>('30')
   const [timeUnit, setTimeUnit] = useState<'minutos' | 'horas'>('minutos')
-  // AÇÃO 2: Estado de Lembrete
-  const [reminderEnabled, setReminderEnabled] = useState(false)
-  const [reminder, setReminder] = useState<string>('09:00')
+  // AÇÃO 2: Estado de Agenda (Planner)
+  const [agendaEnabled, setAgendaEnabled] = useState(false)
+  const [agendaStart, setAgendaStart] = useState<string>('09:00')
+  const [agendaEnd, setAgendaEnd] = useState<string>('10:00')
   // AÇÃO 1: Estado de Frequência
   const [frequency, setFrequency] = useState<string[]>(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'])
   const [creating, setCreating] = useState(false)
@@ -183,13 +190,22 @@ export function CreateHabitDialog({
           setHasTimeGoal(false)
         }
         
-        // Carregar lembrete se existir
+        // Carregar agenda se existir
         if (habitToEdit.notification_time) {
-          setReminderEnabled(true)
-          setReminder(habitToEdit.notification_time)
+          setAgendaEnabled(true)
+          if (habitToEdit.notification_time.includes(' - ')) {
+            const [start, end] = habitToEdit.notification_time.split(' - ')
+            setAgendaStart(start || '09:00')
+            setAgendaEnd(end || '10:00')
+          } else {
+            // Compatibilidade com lembrete antigo
+            setAgendaStart(habitToEdit.notification_time)
+            setAgendaEnd(habitToEdit.notification_time)
+          }
         } else {
-          setReminderEnabled(false)
-          setReminder('09:00')
+          setAgendaEnabled(false)
+          setAgendaStart('09:00')
+          setAgendaEnd('10:00')
         }
       } else {
         // Reset ao abrir modal de criação
@@ -282,7 +298,7 @@ export function CreateHabitDialog({
         target_unit: finalTargetUnit,
         goal_type: finalGoalType as "check" | "time",
         frequency_days: payloadFrequency.map(String), // Converter números para strings
-        notification_time: reminderEnabled ? reminder : undefined, // AÇÃO 2: Lembrete
+        notification_time: agendaEnabled ? `${agendaStart} - ${agendaEnd}` : undefined, // AÇÃO 2: Agenda (Planner)
       }
 
       if (habitToEdit) {
@@ -355,8 +371,9 @@ export function CreateHabitDialog({
     setHasTimeGoal(false)
     setTimeMinutes('30')
     setTimeUnit('minutos')
-    setReminderEnabled(false)
-    setReminder('09:00')
+    setAgendaEnabled(false)
+    setAgendaStart('09:00')
+    setAgendaEnd('10:00')
     setFrequency(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'])
     setStep('selection')
   }
@@ -377,8 +394,9 @@ export function CreateHabitDialog({
     setHasTimeGoal(false)
     setTimeMinutes('30')
     setTimeUnit('minutos')
-    setReminderEnabled(false)
-    setReminder('09:00')
+    setAgendaEnabled(false)
+    setAgendaStart('09:00')
+    setAgendaEnd('10:00')
     setFrequency(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'])
     setStep('config')
   }
@@ -467,109 +485,90 @@ export function CreateHabitDialog({
                 )}
 
                 {/* Input Nome */}
-                <div className="flex items-center gap-3">
-                  {(() => {
-                    const IconComponent = iconMap[icon]
-                    return IconComponent ? (
-                      <div className="text-[#d4af37] shrink-0">
-                        <IconComponent className="w-6 h-6" strokeWidth={2} />
-                      </div>
-                    ) : null
-                  })()}
-                  <Input
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="NOME DO HÁBITO"
-                    className="h-16 text-2xl font-heading bg-transparent border-b border-white/10 rounded-none px-0 text-white placeholder:text-white/20 focus-visible:ring-0 focus-visible:outline-none focus:border-[#d4af37] flex-1"
-                    autoFocus={step === 'config' && !habitToEdit}
+                <div className="flex items-center gap-3 w-full">
+                  <IconPickerPopover 
+                    iconMap={iconMap}
+                    selectedIcon={icon}
+                    onSelect={setIcon}
+                    className="shrink-0"
                   />
+                  <div className="flex-1 bg-white/5 border border-white/10 rounded-2xl flex items-center px-4 h-16 focus-within:border-[#d4af37] focus-within:ring-1 focus-within:ring-[#d4af37] transition-all">
+                    <Input
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="NOME DO HÁBITO"
+                      className="text-xl sm:text-2xl font-heading bg-transparent border-none rounded-none px-0 text-white placeholder:text-white/20 focus-visible:ring-0 focus-visible:outline-none flex-1"
+                      autoFocus={step === 'config' && !habitToEdit}
+                    />
+                  </div>
                 </div>
                 {/* Meta de Tempo */}
                 <div className="space-y-4 pt-4 border-t border-white/5">
                   <div className="flex items-center justify-between">
-                    <Label className="text-lg font-heading tracking-widest text-[#d4af37]">META DE TEMPO?</Label>
+                    <Label className="text-lg font-heading tracking-widest text-[#d4af37]">META DE TEMPO</Label>
                     <button
                       type="button"
                       onClick={() => setHasTimeGoal(!hasTimeGoal)}
                       className={cn(
-                        'relative w-12 h-6 rounded-full transition-all duration-300',
-                        hasTimeGoal ? 'bg-[#d4af37]' : 'bg-white/10'
+                        'w-7 h-7 flex items-center justify-center rounded-md border-2 transition-all duration-300',
+                        hasTimeGoal
+                          ? 'bg-[#d4af37] border-[#d4af37]'
+                          : 'bg-transparent border-white/20 hover:border-white/40'
                       )}
                     >
-                      <div
-                        className={cn(
-                          'absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-all duration-300',
-                          hasTimeGoal ? 'translate-x-6' : 'translate-x-0'
-                        )}
-                      />
+                      {hasTimeGoal && <Check className="w-4 h-4 text-black" strokeWidth={3} />}
                     </button>
                   </div>
                   {hasTimeGoal && (
-                    <div className="flex gap-4">
-                      <Input
-                        type="number"
-                        value={timeMinutes || ''}
-                        onChange={(e) => setTimeMinutes(e.target.value)}
-                        placeholder="00"
-                        className="h-14 text-center text-2xl bg-white/5 border-none text-white placeholder:text-white/50 flex-1 focus-visible:ring-0 focus-visible:outline-none"
+                    <div className="flex w-full mt-2 animate-in slide-in-from-top-2 fade-in duration-200">
+                      <DurationPickerHotbar
+                        value={Number(timeMinutes || 0)}
+                        unit={timeUnit}
+                        onChange={(val, newUnit) => {
+                          setTimeMinutes(String(val))
+                          setTimeUnit(newUnit)
+                        }}
                       />
-                      <div className="flex gap-2 flex-1">
-                        <button
-                          type="button"
-                          onClick={() => setTimeUnit('minutos')}
-                          className={cn(
-                            'flex-1 h-14 border transition-all duration-300 font-heading uppercase tracking-wide text-xs touch-manipulation cursor-pointer rounded-md',
-                            timeUnit === 'minutos'
-                              ? 'border-[#d4af37] bg-[#d4af37] text-black font-bold'
-                              : 'border-[#d4af37]/30 bg-white/5 text-white hover:border-[#d4af37]/50'
-                          )}
-                        >
-                          MIN
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setTimeUnit('horas')}
-                          className={cn(
-                            'flex-1 h-14 border transition-all duration-300 font-heading uppercase tracking-wide text-xs touch-manipulation cursor-pointer rounded-md',
-                            timeUnit === 'horas'
-                              ? 'border-[#d4af37] bg-[#d4af37] text-black font-bold'
-                              : 'border-[#d4af37]/30 bg-white/5 text-white hover:border-[#d4af37]/50'
-                          )}
-                        >
-                          HRS
-                        </button>
-                      </div>
                     </div>
                   )}
                 </div>
 
-                {/* Lembrete */}
+                {/* Agenda */}
                 <div className="space-y-4 pt-4 border-t border-white/5">
                   <div className="flex items-center justify-between">
-                    <Label className="text-lg font-heading tracking-widest text-[#d4af37]">LEMBRETE</Label>
+                    <Label className="text-lg font-heading tracking-widest text-[#d4af37]">AGENDA (PLANNER)</Label>
                     <button
                       type="button"
-                      onClick={() => setReminderEnabled(!reminderEnabled)}
+                      onClick={() => setAgendaEnabled(!agendaEnabled)}
                       className={cn(
-                        'relative w-12 h-6 rounded-full transition-all duration-300',
-                        reminderEnabled ? 'bg-[#d4af37]' : 'bg-white/10'
+                        'w-7 h-7 flex items-center justify-center rounded-md border-2 transition-all duration-300',
+                        agendaEnabled
+                          ? 'bg-[#d4af37] border-[#d4af37]'
+                          : 'bg-transparent border-white/20 hover:border-white/40'
                       )}
                     >
-                      <div
-                        className={cn(
-                          'absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-all duration-300',
-                          reminderEnabled ? 'translate-x-6' : 'translate-x-0'
-                        )}
-                      />
+                      {agendaEnabled && <Check className="w-4 h-4 text-black" strokeWidth={3} />}
                     </button>
                   </div>
-                  {reminderEnabled && (
-                    <Input
-                      type="time"
-                      value={reminder}
-                      onChange={(e) => setReminder(e.target.value)}
-                      className="h-14 bg-white/5 border-none text-white text-lg font-heading focus-visible:ring-0 focus-visible:outline-none"
-                    />
+                  {agendaEnabled && (
+                    <div className="flex gap-4 items-center">
+                      <div className="flex-1">
+                        <Label className="text-xs text-zinc-400 mb-1 block">Início</Label>
+                        <TimePickerHotbar
+                          value={agendaStart}
+                          onChange={setAgendaStart}
+                          className="bg-white/5 border-none"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <Label className="text-xs text-zinc-400 mb-1 block">Fim</Label>
+                        <TimePickerHotbar
+                          value={agendaEnd}
+                          onChange={setAgendaEnd}
+                          className="bg-white/5 border-none"
+                        />
+                      </div>
+                    </div>
                   )}
                 </div>
 

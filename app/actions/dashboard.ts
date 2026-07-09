@@ -300,7 +300,7 @@ export async function getTodayStats(): Promise<{
     const dayBefore = formatBrasiliaDate(subDays(today, 1))
     const dayAfter = formatBrasiliaDate(addDays(today, 1))
 
-    const [habitsResult, journalResult] = await Promise.all([
+    const [habitsResult, journalResult, remindersResult] = await Promise.all([
       supabase
         .from('hexis_habits')
         .select('id, title, goal_type, target_value, target_unit, frequency_days, created_at, category')
@@ -311,10 +311,17 @@ export async function getTodayStats(): Promise<{
         .eq('user_id', user.id)
         .eq('date', todayString)
         .maybeSingle(),
+      supabase
+        .from('hexis_planner_items')
+        .select('id, is_completed')
+        .eq('user_id', user.id)
+        .eq('date', todayString),
     ])
 
     const { data: allHabits, error: habitsError } = habitsResult
     if (habitsError) return { success: false, error: 'Erro ao buscar hábitos' }
+    
+    const allReminders = remindersResult?.data || []
 
     const allHabitIds = (allHabits || []).map((h) => h.id)
 
@@ -345,11 +352,18 @@ export async function getTodayStats(): Promise<{
       return brDate === todayString
     })
 
-    const { total: todayTotal, completed: todayCompleted } = calculateDailyScore(
+    const { total: habitTotal, completed: habitCompleted } = calculateDailyScore(
       todayString,
       allHabits || [],
       periodTracking
     )
+    
+    const reminderTotal = allReminders.length
+    const reminderCompleted = allReminders.filter(r => r.is_completed).length
+    
+    const todayTotal = habitTotal + reminderTotal
+    const todayCompleted = habitCompleted + reminderCompleted
+
     const activeHabitIdsForDay = getActiveHabitIdsForDate(todayString, allHabits || [])
     const completedToday = periodTracking.filter(
       (t) => activeHabitIdsForDay.includes(t.habit_id) && t.completed === true
@@ -413,7 +427,7 @@ export async function getTodayMetrics(): Promise<{
     const dayBefore = formatBrasiliaDate(subDays(today, 1))
     const dayAfter = formatBrasiliaDate(addDays(today, 1))
 
-    const [habitsResult, goalsResult, journalResult] = await Promise.all([
+    const [habitsResult, goalsResult, journalResult, remindersResult] = await Promise.all([
       supabase
         .from('hexis_habits')
         .select('id, title, goal_type, target_value, target_unit, frequency_days, created_at, category')
@@ -429,10 +443,17 @@ export async function getTodayMetrics(): Promise<{
         .eq('user_id', user.id)
         .eq('date', todayString)
         .maybeSingle(),
+      supabase
+        .from('hexis_planner_items')
+        .select('id, is_completed')
+        .eq('user_id', user.id)
+        .eq('date', todayString),
     ])
 
     const { data: allHabits, error: habitsError } = habitsResult
     if (habitsError) return { success: false, error: 'Erro ao buscar hábitos' }
+    
+    const allReminders = remindersResult?.data || []
 
     const allHabitIds = (allHabits || []).map((h) => h.id)
 
@@ -463,11 +484,18 @@ export async function getTodayMetrics(): Promise<{
       return brDate === todayString
     })
 
-    const { total: todayTotal, completed: todayCompleted } = calculateDailyScore(
+    const { total: habitTotal, completed: habitCompleted } = calculateDailyScore(
       todayString,
       allHabits || [],
       periodTracking
     )
+    
+    const reminderTotal = allReminders.length
+    const reminderCompleted = allReminders.filter(r => r.is_completed).length
+    
+    const todayTotal = habitTotal + reminderTotal
+    const todayCompleted = habitCompleted + reminderCompleted
+
     const activeHabitIdsForDay = getActiveHabitIdsForDate(todayString, allHabits || [])
     const completedToday = periodTracking.filter(
       (t) => activeHabitIdsForDay.includes(t.habit_id) && t.completed === true

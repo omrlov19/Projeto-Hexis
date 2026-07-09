@@ -166,3 +166,18 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #e5c06e;
 }
+
+/* Ocultar barra de navegação inferior quando houver um modal (hotbar) aberto */
+body[data-scroll-locked] .app-bottom-nav {
+  display: none !important;
+}
+
+/* Ocultar setas padrão do input type="number" */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}

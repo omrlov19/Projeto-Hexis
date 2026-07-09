@@ -503,7 +503,7 @@ function BlockerContent() {
                   className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white/50 hover:text-white/70 font-heading uppercase tracking-widest text-xs transition-colors duration-300 rounded-lg border border-white/10 flex items-center gap-2"
                 >
                   {isScreenOff ? <Eye className="w-4 h-4" /> : <Waves className="w-4 h-4" />}
-                  {isScreenOff ? 'DESATIVAR FLOW' : 'ATIVAR FLOW'}
+                  {isScreenOff ? 'SAIR DO FLOW' : 'FLOW'}
                 </button>
                 <button
                   onClick={completeFocusEarly}
@@ -791,7 +791,7 @@ function BlockerContent() {
               Ao iniciar, você firma um compromisso. Se sair desta tela por mais de <span className="text-white font-bold">15 segundos</span>, a sessão falhará.
             </p>
             <p className="text-[1.15rem] text-zinc-300 font-body font-medium leading-relaxed">
-              Para economizar bateria, use o botão <span className="text-white font-bold">'Ativar Flow'</span> do app. Não bloqueie o celular.
+              Para economizar bateria, use o botão <span className="text-white font-bold">'Flow'</span> do app. Não bloqueie o celular.
             </p>
           </div>
 

@@ -181,3 +181,54 @@ export async function toggleReminderStatus(
     return { success: false, error: error?.message || 'Erro ao alternar lembrete' }
   }
 }
+
+/**
+ * Atualiza título, data e/ou horário de um lembrete existente.
+ */
+export async function updateReminder(
+  id: string,
+  input: { title: string; date: string; time: string | null }
+): Promise<{ success: boolean; data?: PlannerReminderRow; error?: string }> {
+  try {
+    const supabase = await createClient()
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return { success: false, error: 'Usuário não autenticado' }
+    }
+
+    if (!input.title || input.title.trim().length === 0) {
+      return { success: false, error: 'Título é obrigatório' }
+    }
+
+    // IDs temporários não existem no banco
+    if (id.startsWith('temp-')) {
+      return { success: false, error: 'Lembrete ainda não sincronizado' }
+    }
+
+    const { data, error } = await supabase
+      .from('hexis_planner_items')
+      .update({
+        title: input.title.trim(),
+        date: input.date,
+        time: input.time,
+      })
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select('id, user_id, title, date, time, is_completed, created_at')
+      .single()
+
+    if (error || !data) {
+      return { success: false, error: error?.message || 'Falha ao atualizar lembrete' }
+    }
+
+    return { success: true, data: data as PlannerReminderRow }
+  } catch (error: any) {
+    console.error('❌ ERRO CRÍTICO: Exceção ao atualizar lembrete', error?.message, error)
+    return { success: false, error: error?.message || 'Erro ao atualizar lembrete' }
+  }
+}

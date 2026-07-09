@@ -20,10 +20,15 @@ export function JournalingStatus({ hasJournaledToday }: JournalingStatusProps) {
       title={isDone ? 'Journaling do dia concluído' : 'Fazer journaling do dia'}
     >
       {isDone ? (
-        <BookOpen
-          className="w-14 h-14 flex-shrink-0 text-[#E5C06E] drop-shadow-[0_0_12px_rgba(229,192,110,0.6)]"
-          strokeWidth={1.5}
-        />
+        <>
+          <BookOpen
+            className="w-14 h-14 flex-shrink-0 text-[#E5C06E] drop-shadow-[0_0_12px_rgba(229,192,110,0.6)]"
+            strokeWidth={1.5}
+          />
+          <span className="text-base font-heading font-semibold text-[#E5C06E] uppercase tracking-wide mt-2 text-center">
+            Journaling Anotado
+          </span>
+        </>
       ) : (
         <>
           <BookOpen

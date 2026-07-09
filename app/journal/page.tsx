@@ -6,6 +6,7 @@ import { JournalTemplateSelector } from '@/components/JournalTemplateSelector'
 import { JournalEditor } from '@/components/JournalEditor'
 import { getBrasiliaDate, formatBrasiliaDate } from '@/lib/date'
 import { cn } from '@/lib/utils'
+import { saveJournalEntry, getJournalEntries, deleteJournalEntry } from '@/app/actions/journal'
 
 // Tipo para os dados de uma entrada do journal
 type JournalEntryData = {
@@ -54,20 +55,22 @@ export default function JournalPage() {
   const [initialEditorData, setInitialEditorData] = useState<JournalEntryData | null>(null)
   
   // Estado para armazenar todas as entradas do journal
-  const [journalEntries, setJournalEntries] = useState<JournalEntries>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('hexis_journal')
-      if (saved) {
-        try {
-          return JSON.parse(saved)
-        } catch (e) {
-          console.error('Erro ao carregar journal do localStorage:', e)
-          return {}
-        }
+  const [journalEntries, setJournalEntries] = useState<JournalEntries>({})
+  
+  // Carregar do Supabase ao montar o componente
+  useEffect(() => {
+    let mounted = true
+    getJournalEntries().then((res) => {
+      if (mounted && res.success && res.data) {
+        const loaded: JournalEntries = {}
+        res.data.forEach((entry) => {
+          loaded[entry.date] = entry.content
+        })
+        setJournalEntries(loaded)
       }
-    }
-    return {}
-  })
+    })
+    return () => { mounted = false }
+  }, [])
   
   const today = useMemo(() => getBrasiliaDate(), [])
   
@@ -85,7 +88,7 @@ export default function JournalPage() {
   }, [journalEntries])
 
   // Função para salvar uma entrada
-  const handleSaveEntry = (date: Date, data: JournalEntryData) => {
+  const handleSaveEntry = async (date: Date, data: JournalEntryData) => {
     try {
       const dateKey = getDateKey(date)
       const updatedEntries = {
@@ -93,13 +96,11 @@ export default function JournalPage() {
         [dateKey]: data
       }
       
-      // Atualizar estado
+      // Atualizar estado local otimista
       setJournalEntries(updatedEntries)
       
-      // Salvar no localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('hexis_journal', JSON.stringify(updatedEntries))
-      }
+      // Salvar no Supabase
+      await saveJournalEntry(dateKey, data)
       
       // Fechar o editor COMPLETAMENTE - voltar para a tela principal
       setWritingMode(null)
@@ -112,19 +113,17 @@ export default function JournalPage() {
   }
 
   // Função para deletar uma entrada
-  const handleDeleteEntry = (date: Date) => {
+  const handleDeleteEntry = async (date: Date) => {
     try {
       const dateKey = getDateKey(date)
       const updatedEntries = { ...journalEntries }
       delete updatedEntries[dateKey]
       
-      // Atualizar estado
+      // Atualizar estado local otimista
       setJournalEntries(updatedEntries)
       
-      // Salvar no localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('hexis_journal', JSON.stringify(updatedEntries))
-      }
+      // Deletar no Supabase
+      await deleteJournalEntry(dateKey)
       
       // Fechar o editor e limpar seleção
       setWritingMode(null)

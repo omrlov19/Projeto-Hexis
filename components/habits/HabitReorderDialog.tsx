@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, startTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Dialog,
@@ -182,29 +182,29 @@ export function HabitReorderDialog({
     const { active, over } = event
     if (!over || active.id === over.id) return
 
+    const oldIndex = items.findIndex((i) => i.id === active.id)
+    const newIndex = items.findIndex((i) => i.id === over.id)
+    const newOrder = arrayMove(items, oldIndex, newIndex)
+
     // 1. Atualização Local (Permitido ser síncrono para fluidez)
-    setItems((items) => {
-      const oldIndex = items.findIndex((i) => i.id === active.id)
-      const newIndex = items.findIndex((i) => i.id === over.id)
-      const newOrder = arrayMove(items, oldIndex, newIndex)
+    setItems(newOrder)
 
-      // 2. Avisar o Pai (ASSÍNCRONO OBRIGATÓRIO)
-      // O setTimeout(..., 0) joga a execução para o final da fila, resolvendo o erro do React.
-      if (onReorder) {
-        setTimeout(() => {
-          const optimizedOrder = newOrder.map((item, index) => ({
-            ...item,
-            position: index,
-          }))
-          onReorder(optimizedOrder)
-        }, 0)
-      }
+    // 2. Avisar o Pai (ASSÍNCRONO OBRIGATÓRIO)
+    // O setTimeout(..., 0) joga a execução para o final da fila, resolvendo o erro do React.
+    if (onReorder) {
+      setTimeout(() => {
+        const optimizedOrder = newOrder.map((item, index) => ({
+          ...item,
+          position: index,
+        }))
+        onReorder(optimizedOrder)
+      }, 0)
+    }
 
-      // 3. Salvar no Banco
-      const orderMap = newOrder.map((h, index) => ({ id: h.id, position: index }))
+    // 3. Salvar no Banco
+    const orderMap = newOrder.map((h, index) => ({ id: h.id, position: index }))
+    startTransition(() => {
       reorderHabits(orderMap)
-
-      return newOrder
     })
   }
 

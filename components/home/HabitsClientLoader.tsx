@@ -19,31 +19,46 @@ export default function HabitsClientLoader() {
 
   useEffect(() => {
     let cancelled = false
-    setError(null)
-    fetch(`/api/habits?date=${encodeURIComponent(dateString)}`)
-      .then((res) => {
-        if (cancelled) return
-        if (res.status === 401) {
-          router.push('/login')
-          return null
-        }
-        if (!res.ok) throw new Error('Erro ao carregar hábitos')
-        return res.json()
-      })
-      .then((data) => {
-        if (cancelled || !data) return
-        if (data.success) {
-          setHabits(data.habits ?? [])
-          setHistory(data.history ?? {})
-          if (data.selectedDate) setSelectedDate(new Date(data.selectedDate))
-        } else {
-          setError(data.error ?? 'Erro ao carregar')
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err.message ?? 'Erro ao carregar')
-      })
-    return () => { cancelled = true }
+
+    const loadData = () => {
+      setError(null)
+      fetch(`/api/habits?date=${encodeURIComponent(dateString)}`)
+        .then((res) => {
+          if (cancelled) return
+          if (res.status === 401) {
+            router.push('/login')
+            return null
+          }
+          if (!res.ok) throw new Error('Erro ao carregar hábitos')
+          return res.json()
+        })
+        .then((data) => {
+          if (cancelled || !data) return
+          if (data.success) {
+            setHabits(data.habits ?? [])
+            setHistory(data.history ?? {})
+            if (data.selectedDate) setSelectedDate(new Date(data.selectedDate))
+          } else {
+            setError(data.error ?? 'Erro ao carregar')
+          }
+        })
+        .catch((err) => {
+          if (!cancelled) setError(err.message ?? 'Erro ao carregar')
+        })
+    }
+
+    loadData()
+
+    const handleHabitsChanged = () => {
+      loadData()
+    }
+
+    window.addEventListener('habits-changed', handleHabitsChanged)
+
+    return () => { 
+      cancelled = true 
+      window.removeEventListener('habits-changed', handleHabitsChanged)
+    }
   }, [router, dateString])
 
   // UI First: sempre renderizar estrutura (header, calendário, lista). Dados brotam quando o fetch terminar.

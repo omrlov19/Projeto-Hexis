@@ -124,7 +124,7 @@ export function UserProfileModal(props: UserProfileModalProps) {
         </button>
       </DialogTrigger>
       
-      <DialogContent className="bg-[#0a0a0c] border border-[#d4af37]/30 max-w-lg w-[95vw] rounded-3xl p-6 sm:p-8 text-white shadow-[0_10px_40px_rgba(212,175,55,0.15)] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="bg-[#0a0a0c] border border-[#d4af37]/30 max-w-lg w-[95vw] rounded-3xl p-6 sm:p-8 text-white shadow-[0_10px_40px_rgba(212,175,55,0.15)] max-h-[90vh] overflow-y-auto custom-scrollbar">
         <DialogHeader className="mb-6">
           <div className="relative mx-auto w-24 h-24 mb-4">
             <label className="relative block w-full h-full bg-zinc-900 border-2 border-[#d4af37] rounded-full flex items-center justify-center group overflow-hidden cursor-pointer">
@@ -275,7 +275,7 @@ export function UserProfileModal(props: UserProfileModalProps) {
           </button>
           
           <p className="text-center text-[10px] uppercase tracking-widest text-zinc-600 font-bold mt-2">
-            Versão 1.0.0
+            Versão 1.0.1
           </p>
         </div>
       </DialogContent>

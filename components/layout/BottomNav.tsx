@@ -61,7 +61,7 @@ export function BottomNav() {
 
   return (
     <nav 
-      className="fixed bottom-6 lg:bottom-8 left-0 right-0 mx-auto z-[999] w-[90%] max-w-[280px] lg:max-w-[500px] h-14 lg:h-16 rounded-2xl bg-[#0a0a0c] border border-[#d4af37] shadow-[0_4px_20px_rgba(212,175,55,0.4)]"
+      className="app-bottom-nav fixed bottom-6 lg:bottom-8 left-0 right-0 mx-auto z-[999] w-[90%] max-w-[280px] lg:max-w-[500px] h-14 lg:h-16 rounded-2xl bg-[#0a0a0c] border border-[#d4af37] shadow-[0_4px_20px_rgba(212,175,55,0.4)] transition-opacity duration-300"
     >
       <div className="flex items-center justify-around lg:justify-center lg:gap-x-12 px-1 lg:px-4 h-full py-0">
         

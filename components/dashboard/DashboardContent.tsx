@@ -18,7 +18,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 type PopoverCard = 'habits' | 'focus' | 'productivity' | null
 
 const CARD_EXPLANATIONS: Record<Exclude<PopoverCard, null>, string> = {
-  habits: 'Total de hábitos executados hoje em relação à sua meta diária.',
+  habits: 'Total de tarefas (hábitos + lembretes) executadas hoje.',
   focus: 'Soma total do tempo dedicado a tarefas de foco ativo (exclui tempo de sono).',
   productivity:
     'Sua performance diária (0-100%) é uma média entre Consistência (hábitos) e Profundidade (foco). Fórmula: ( % Hábitos + % Foco ) / 2.',
@@ -233,7 +233,7 @@ export default function DashboardContent({ userName: initialUserName = '', consi
               <div className="absolute inset-0 w-full h-full rounded-3xl bg-slate-900 flex flex-col justify-between p-6 z-10">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-black text-white uppercase tracking-wide">
-                    Hábitos Concluídos
+                    Tarefas Concluídas
                   </span>
                   <Check className="w-6 h-6 text-white flex-shrink-0" strokeWidth={2.5} />
                 </div>
@@ -250,7 +250,7 @@ export default function DashboardContent({ userName: initialUserName = '', consi
               >
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-black text-slate-950 uppercase tracking-wide">
-                    Hábitos Concluídos
+                    Tarefas Concluídas
                   </span>
                   <Check className="w-6 h-6 text-slate-950 flex-shrink-0" strokeWidth={2.5} />
                 </div>
@@ -345,7 +345,7 @@ export default function DashboardContent({ userName: initialUserName = '', consi
                   <div className="h-full rounded-full bg-[#D4AF37] transition-all duration-1000 ease-out" style={{ width: `${Math.min(100, level)}%` }} />
                 </div>
                 <p className="text-xs text-zinc-500 text-center uppercase tracking-widest font-heading">
-                  Taxa de Hábitos Concluídos
+                  Taxa de Tarefas Concluídas
                 </p>
               </div>
             </div>

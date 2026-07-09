@@ -50,9 +50,11 @@ function isSameDay(date1: Date, date2: Date): boolean {
   )
 }
 
-// Converter horário de "HH:MM:SS" ou "HH:MM" para "HH:MM"
+// Converter horário de "HH:MM:SS", "HH:MM" ou "HH:MM - HH:MM" para formato exibível
 function normalizeTime(time: string | null | undefined): string | null {
   if (!time) return null
+  // Se for range "HH:MM - HH:MM", retorna direto (Planner do Hábito)
+  if (time.match(/^\d{2}:\d{2}\s*-\s*\d{2}:\d{2}$/)) return time
   // Se já está em formato HH:MM, retorna direto
   if (time.match(/^\d{2}:\d{2}$/)) return time
   // Se está em formato HH:MM:SS, pega apenas HH:MM

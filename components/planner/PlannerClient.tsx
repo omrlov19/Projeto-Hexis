@@ -1,12 +1,14 @@
 'use client'
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { Check, Plus, Clock, Repeat, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Check, Plus, Clock, Repeat, Trash2, ChevronLeft, ChevronRight, Play, Pencil } from 'lucide-react'
 import { getBrasiliaDate, formatBrasiliaDate } from '@/lib/date'
 import { cn } from '@/lib/utils'
 import { DayViewModal } from '@/components/DayViewModal'
+import { TimePickerHotbar } from '@/components/ui/TimePickerHotbar'
 import { getHabits } from '@/app/actions/habits'
-import { createReminder, deleteReminder, getReminders, toggleReminderStatus } from '@/app/actions/planner'
+import { createReminder, deleteReminder, getReminders, toggleReminderStatus, updateReminder } from '@/app/actions/planner'
 import type { PlannerReminderRow } from '@/app/actions/planner'
 import type { HabitWithStatus, Reminder } from '@/types/hexis'
 import {
@@ -38,7 +40,7 @@ function rowToReminder(row: PlannerReminderRow): Reminder {
     id: row.id,
     title: row.title,
     date: new Date(y, m - 1, d),
-    time: row.time,
+    time: normalizeTime(row.time),
     isCompleted: row.is_completed,
   }
 }
@@ -50,14 +52,18 @@ interface TimelineItem {
   time: string | null
   isRecurring: boolean
   isReminder: boolean
+  isFreeSlot?: boolean // Para blocos de tempo livre (Eco)
 }
 
-// Função auxiliar para normalizar horário
+// Converter horário de "HH:MM:SS", "HH:MM" ou "HH:MM - HH:MM" para "HH:MM" ou range
 function normalizeTime(time: string | null | undefined): string | null {
   if (!time) return null
-  // Se já está no formato HH:MM, retornar
-  if (/^\d{2}:\d{2}$/.test(time)) return time
-  // Tentar converter outros formatos se necessário
+  // Se for range "HH:MM - HH:MM"
+  if (time.match(/^\d{2}:\d{2}\s*-\s*\d{2}:\d{2}$/)) return time
+  // Se já está em formato HH:MM, retorna direto
+  if (time.match(/^\d{2}:\d{2}$/)) return time
+  // Se está em formato HH:MM:SS, pega apenas HH:MM
+  if (time.match(/^\d{2}:\d{2}:\d{2}$/)) return time.substring(0, 5)
   return null
 }
 
@@ -121,6 +127,98 @@ async function getDayTimelineData(
   })
 }
 
+// =============================================
+// Componente: HexisCalendar — Calendário customizado com identidade visual Hexis
+// =============================================
+function HexisCalendar({
+  selectedDate,
+  onSelectDate,
+  today,
+}: {
+  selectedDate: Date
+  onSelectDate: (date: Date) => void
+  today: Date
+}) {
+  const [calViewDate, setCalViewDate] = useState<Date>(
+    new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1)
+  )
+  const calMonth = calViewDate.getMonth()
+  const calYear = calViewDate.getFullYear()
+
+  const firstDay = new Date(calYear, calMonth, 1).getDay()
+  const daysInMo = new Date(calYear, calMonth + 1, 0).getDate()
+
+  const cells: (number | null)[] = []
+  for (let i = 0; i < firstDay; i++) cells.push(null)
+  for (let i = 1; i <= daysInMo; i++) cells.push(i)
+
+  const CAL_MONTHS = [
+    'JANEIRO','FEVEREIRO','MARÇO','ABRIL','MAIO','JUNHO',
+    'JULHO','AGOSTO','SETEMBRO','OUTUBRO','NOVEMBRO','DEZEMBRO',
+  ]
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-3">
+      {/* Header — Mês / Ano / Setas */}
+      <div className="flex items-center justify-between mb-3">
+        <button
+          type="button"
+          onClick={() => setCalViewDate(new Date(calYear, calMonth - 1, 1))}
+          className="p-1.5 rounded hover:bg-white/10 text-zinc-400 hover:text-[#d4af37] transition-colors"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <span className="text-sm font-heading uppercase tracking-widest text-[#d4af37]">
+          {CAL_MONTHS[calMonth]} {calYear}
+        </span>
+        <button
+          type="button"
+          onClick={() => setCalViewDate(new Date(calYear, calMonth + 1, 1))}
+          className="p-1.5 rounded hover:bg-white/10 text-zinc-400 hover:text-[#d4af37] transition-colors"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Dias da semana */}
+      <div className="grid grid-cols-7 gap-1 mb-1">
+        {['D','S','T','Q','Q','S','S'].map((d, i) => (
+          <div key={i} className="text-center text-[10px] font-heading uppercase tracking-wider text-zinc-500 py-1">
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Grid de dias */}
+      <div className="grid grid-cols-7 gap-1">
+        {cells.map((day, idx) => {
+          if (day === null) return <div key={idx} />
+          const cellDate = new Date(calYear, calMonth, day)
+          const isSelected = isSameDay(cellDate, selectedDate)
+          const isToday = isSameDay(cellDate, today)
+          return (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => onSelectDate(cellDate)}
+              className={cn(
+                'aspect-square flex items-center justify-center rounded-md text-sm transition-all duration-200',
+                isSelected
+                  ? 'bg-[#d4af37] text-black font-bold shadow-[0_0_12px_rgba(212,175,55,0.4)]'
+                  : isToday
+                  ? 'border border-[#d4af37]/50 text-[#d4af37] hover:bg-[#d4af37]/20'
+                  : 'text-zinc-300 hover:bg-white/10 hover:text-white'
+              )}
+            >
+              {day}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 interface PlannerClientProps {
   initialHabits: HabitWithStatus[]
   initialReminders?: PlannerReminderRow[]
@@ -129,6 +227,7 @@ interface PlannerClientProps {
 }
 
 export default function PlannerClient({ initialHabits, initialReminders = [], hideHeader = false }: PlannerClientProps) {
+  const router = useRouter()
   // Estabilizar 'today' para evitar recálculos desnecessários
   const today = useMemo(() => getBrasiliaDate(), [])
   
@@ -190,25 +289,100 @@ export default function PlannerClient({ initialHabits, initialReminders = [], hi
   // AÇÃO 1: Estado para modal de confirmação de exclusão
   const [itemToDelete, setItemToDelete] = useState<string | null>(null)
 
-  // Filtro de visualização do dia: Tudo (hábitos + lembretes) ou Apenas Lembretes
-  const [listFilter, setListFilter] = useState<'all' | 'reminders'>('all')
+  // Filtro de visualização do dia: Tudo, Apenas Lembretes, ou Eco (tempo livre)
+  const [listFilter, setListFilter] = useState<'all' | 'reminders' | 'eco'>('all')
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('hexis_planner_filter')
-      if (saved === 'all' || saved === 'reminders') {
+      if (saved === 'all' || saved === 'reminders' || saved === 'eco') {
         setListFilter(saved)
       }
     }
   }, [])
+
+  // Calcular blocos de tempo livre (Eco) a partir da timeline
+  const computeEcoTimeline = (timeline: TimelineItem[]): TimelineItem[] => {
+    const DAY_START = '06:00' // Início do período útil do dia
+    const DAY_END = '23:00'   // Fim do período útil do dia
+
+    // Extrair todos os horários ocupados (apenas itens com horário definido)
+    const occupiedSlots: { start: string; end: string }[] = []
+
+    for (const item of timeline) {
+      if (!item.time) continue
+      const rangeMatch = item.time.match(/^(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})$/)
+      if (rangeMatch) {
+        occupiedSlots.push({ start: rangeMatch[1], end: rangeMatch[2] })
+      } else {
+        // Item com apenas horário de início: assumir 30min de duração
+        const [h, m] = item.time.split(':').map(Number)
+        const endMin = h * 60 + m + 30
+        const endH = String(Math.floor(endMin / 60)).padStart(2, '0')
+        const endM = String(endMin % 60).padStart(2, '0')
+        occupiedSlots.push({ start: item.time, end: `${endH}:${endM}` })
+      }
+    }
+
+    // Ordenar por horário de início
+    occupiedSlots.sort((a, b) => a.start.localeCompare(b.start))
+
+    // Merge de slots sobrepostos
+    const merged: { start: string; end: string }[] = []
+    for (const slot of occupiedSlots) {
+      if (merged.length === 0 || slot.start > merged[merged.length - 1].end) {
+        merged.push({ ...slot })
+      } else {
+        merged[merged.length - 1].end =
+          slot.end > merged[merged.length - 1].end ? slot.end : merged[merged.length - 1].end
+      }
+    }
+
+    // Calcular lacunas (tempo livre)
+    const freeSlots: TimelineItem[] = []
+    let cursor = DAY_START
+
+    for (const slot of merged) {
+      if (cursor < slot.start) {
+        freeSlots.push({
+          id: `eco-${cursor}-${slot.start}`,
+          title: 'Tempo Livre',
+          time: `${cursor} - ${slot.start}`,
+          isRecurring: false,
+          isReminder: false,
+          isFreeSlot: true,
+        })
+      }
+      cursor = slot.end > cursor ? slot.end : cursor
+    }
+
+    // Último bloco livre até o fim do dia
+    if (cursor < DAY_END) {
+      freeSlots.push({
+        id: `eco-${cursor}-${DAY_END}`,
+        title: 'Tempo Livre',
+        time: `${cursor} - ${DAY_END}`,
+        isRecurring: false,
+        isReminder: false,
+        isFreeSlot: true,
+      })
+    }
+
+    return freeSlots
+  }
 
   // Estado para lembretes — fonte de verdade: Supabase
   const [reminders, setReminders] = useState<Reminder[]>(() =>
     (initialReminders ?? []).map(rowToReminder)
   )
   const [newReminderText, setNewReminderText] = useState('')
-  const [newReminderTime, setNewReminderTime] = useState<string>('')
+  const [newReminderTimeStart, setNewReminderTimeStart] = useState<string>('')
+  const [newReminderTimeEnd, setNewReminderTimeEnd] = useState<string>('')
+  const [hasEndTime, setHasEndTime] = useState(false)
   const [newReminderDate, setNewReminderDate] = useState<Date | null>(null) // Data selecionada para o lembrete
+
+  // Estado para modo edição de lembrete
+  const [editingReminder, setEditingReminder] = useState<Reminder | null>(null)
 
   // Sincronizar initialReminders quando mudar
   useEffect(() => {
@@ -370,6 +544,12 @@ export default function PlannerClient({ initialHabits, initialReminders = [], hi
 
   // Handler para abrir modal de adicionar lembrete
   const handleOpenAddModal = (date?: Date | null) => {
+    // Limpar estado de edição
+    setEditingReminder(null)
+    setNewReminderText('')
+    setNewReminderTimeStart('')
+    setNewReminderTimeEnd('')
+    setHasEndTime(false)
     if (date) {
       setNewReminderDate(new Date(date))
     } else {
@@ -378,18 +558,110 @@ export default function PlannerClient({ initialHabits, initialReminders = [], hi
     setIsAddModalOpen(true)
   }
 
-  // Handler para salvar novo lembrete (Optimistic UI + troca de ID)
+  // Handler para abrir modal em modo edição
+  const handleOpenEditModal = (reminder: Reminder) => {
+    setEditingReminder(reminder)
+    setNewReminderText(reminder.title)
+    setNewReminderDate(new Date(reminder.date))
+    // Parsear time para início/fim
+    if (reminder.time) {
+      const rangeMatch = reminder.time.match(/^(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})$/)
+      if (rangeMatch) {
+        setNewReminderTimeStart(rangeMatch[1])
+        setNewReminderTimeEnd(rangeMatch[2])
+        setHasEndTime(true)
+      } else {
+        setNewReminderTimeStart(reminder.time.substring(0, 5))
+        setNewReminderTimeEnd('')
+        setHasEndTime(false)
+      }
+    } else {
+      setNewReminderTimeStart('')
+      setNewReminderTimeEnd('')
+      setHasEndTime(false)
+    }
+    setIsAddModalOpen(true)
+  }
+
+  // Handler para redirecionar para Focus
+  const handleGoToFocus = (title: string) => {
+    router.push(`/blocker?taskName=${encodeURIComponent(title)}&autoStart=true`)
+  }
+
+  // Montar o valor de time a partir dos campos de início/fim
+  const buildTimeValue = (): string | null => {
+    const start = newReminderTimeStart.trim()
+    const end = newReminderTimeEnd.trim()
+    if (!start) return null
+    if (hasEndTime && end) return `${start} - ${end}`
+    return start
+  }
+
+  // Handler para salvar novo lembrete OU atualizar existente
   const handleSaveReminder = async () => {
     if (!newReminderText.trim()) return
 
     const reminderDate = newReminderDate || today
+    const timeValue = buildTimeValue()
+
+    // ——— Modo Edição ———
+    if (editingReminder) {
+      const editId = editingReminder.id
+      const savedTitle = newReminderText.trim()
+      const savedDateStr = formatBrasiliaDate(reminderDate)
+
+      // Optimistic update local
+      setReminders((prev) =>
+        prev.map((r) =>
+          r.id === editId
+            ? { ...r, title: savedTitle, date: reminderDate, time: timeValue }
+            : r
+        )
+      )
+      setDayTimeline((prev) =>
+        prev.map((item) =>
+          item.id === editId
+            ? { ...item, title: savedTitle, time: timeValue }
+            : item
+        )
+      )
+
+      // Fechar modal
+      setNewReminderText('')
+      setNewReminderTimeStart('')
+      setNewReminderTimeEnd('')
+      setHasEndTime(false)
+      setNewReminderDate(null)
+      setEditingReminder(null)
+      setIsAddModalOpen(false)
+
+      // Sincronizar com banco
+      try {
+        const response = await updateReminder(editId, {
+          title: savedTitle,
+          date: savedDateStr,
+          time: timeValue,
+        })
+        if (!response.success) {
+          console.error('Erro ao atualizar lembrete:', response.error)
+          // Recarregar dados frescos em caso de falha
+          setRefreshTrigger((prev) => prev + 1)
+        }
+      } catch (e) {
+        console.error('Erro ao atualizar lembrete:', e)
+        setRefreshTrigger((prev) => prev + 1)
+      }
+      return
+    }
+
+    // ——— Modo Criação ———
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`
 
     const tempItem: Reminder = {
       id: tempId,
       title: newReminderText.trim(),
       date: reminderDate,
-      time: newReminderTime || null,
+      time: timeValue,
       isCompleted: false,
     }
 
@@ -403,7 +675,9 @@ export default function PlannerClient({ initialHabits, initialReminders = [], hi
 
     // 2) Fechar modal imediatamente
     setNewReminderText('')
-    setNewReminderTime('')
+    setNewReminderTimeStart('')
+    setNewReminderTimeEnd('')
+    setHasEndTime(false)
     setNewReminderDate(null)
     setIsAddModalOpen(false)
 
@@ -425,7 +699,7 @@ export default function PlannerClient({ initialHabits, initialReminders = [], hi
                   id: realId,
                   title: response.data!.title,
                   date: new Date(response.data!.date),
-                  time: response.data!.time,
+                  time: normalizeTime(response.data!.time),
                   isCompleted: response.data!.is_completed,
                 }
               : r
@@ -515,7 +789,22 @@ export default function PlannerClient({ initialHabits, initialReminders = [], hi
                   : 'text-zinc-500 hover:text-zinc-300'
               )}
             >
-              Apenas Lembretes
+              Lembretes
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setListFilter('eco')
+                localStorage.setItem('hexis_planner_filter', 'eco')
+              }}
+              className={cn(
+                'px-4 py-2 rounded-md text-sm font-heading uppercase tracking-wider',
+                listFilter === 'eco'
+                  ? 'bg-[#d4af37]/20 text-[#d4af37] border border-[#d4af37]/30'
+                  : 'text-zinc-500 hover:text-zinc-300'
+              )}
+            >
+              Eco
             </button>
           </div>
         </div>
@@ -525,11 +814,19 @@ export default function PlannerClient({ initialHabits, initialReminders = [], hi
       {viewMode === 'day' && (
         <DayViewContent
           today={today}
-          timeline={listFilter === 'reminders' ? dayTimeline.filter((i) => i.isReminder) : dayTimeline}
+          timeline={
+            listFilter === 'reminders'
+              ? dayTimeline.filter((i) => i.isReminder)
+              : listFilter === 'eco'
+              ? computeEcoTimeline(dayTimeline)
+              : dayTimeline
+          }
           loading={dayTimelineLoading}
           reminders={reminders}
           onToggleReminder={handleToggleReminder}
           onDeleteReminder={handleRequestDelete}
+          onEditReminder={handleOpenEditModal}
+          onGoToFocus={handleGoToFocus}
         />
       )}
 
@@ -607,15 +904,26 @@ export default function PlannerClient({ initialHabits, initialReminders = [], hi
         </DialogContent>
       </Dialog>
 
-      {/* Modal de Criação de Lembrete */}
-      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-        <DialogContent className="bg-zinc-950 border border-[#d4af37]/30 text-white max-w-md">
+      {/* Modal de Criação / Edição de Lembrete */}
+      <Dialog open={isAddModalOpen} onOpenChange={(open) => {
+        if (!open) {
+          setIsAddModalOpen(false)
+          setEditingReminder(null)
+          setNewReminderText('')
+          setNewReminderTimeStart('')
+          setNewReminderTimeEnd('')
+          setHasEndTime(false)
+          setNewReminderDate(null)
+        }
+      }}>
+        <DialogContent className="bg-zinc-950 border border-[#d4af37]/30 text-white max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl font-heading uppercase tracking-widest text-[#d4af37]">
-              NOVO LEMBRETE
+              {editingReminder ? 'EDITAR LEMBRETE' : 'NOVO LEMBRETE'}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 mt-4">
+          <div className="space-y-5 mt-4">
+            {/* Campo Texto */}
             <div>
               <label className="block text-sm font-heading uppercase tracking-wide text-zinc-400 mb-2">
                 TEXTO
@@ -629,50 +937,92 @@ export default function PlannerClient({ initialHabits, initialReminders = [], hi
                 autoFocus
               />
             </div>
+
+            {/* Calendário customizado Hexis */}
             <div>
               <label className="block text-sm font-heading uppercase tracking-wide text-zinc-400 mb-2">
                 DATA
               </label>
-              <input
-                type="date"
-                value={newReminderDate ? formatBrasiliaDate(newReminderDate) : formatBrasiliaDate(today)}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    const [year, month, day] = e.target.value.split('-').map(Number)
-                    setNewReminderDate(new Date(year, month - 1, day))
-                  } else {
-                    setNewReminderDate(null)
-                  }
-                }}
-                className="w-full min-w-0 max-w-full block px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-[#d4af37]/50 transition-colors"
+              <HexisCalendar
+                selectedDate={newReminderDate || today}
+                onSelectDate={(date) => setNewReminderDate(date)}
+                today={today}
               />
             </div>
+
+            {/* Horário — Início e Fim */}
             <div>
               <label className="block text-sm font-heading uppercase tracking-wide text-zinc-400 mb-2">
                 HORÁRIO (OPCIONAL)
               </label>
-              <input
-                type="time"
-                value={newReminderTime}
-                onChange={(e) => setNewReminderTime(e.target.value)}
-                className="w-full min-w-0 max-w-full block px-4 py-3 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-[#d4af37]/50 transition-colors"
-              />
+              <div className="space-y-3">
+                {/* Início */}
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-heading uppercase tracking-wider text-zinc-500 w-12 flex-shrink-0">Início</span>
+                  <TimePickerHotbar
+                    value={newReminderTimeStart}
+                    onChange={setNewReminderTimeStart}
+                    className="flex-1 bg-zinc-900 border-zinc-700"
+                  />
+                </div>
+
+                {/* Toggle para horário de fim */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHasEndTime(!hasEndTime)
+                    if (hasEndTime) setNewReminderTimeEnd('')
+                  }}
+                  className={cn(
+                    'flex items-center gap-2 text-xs font-heading uppercase tracking-wider transition-colors',
+                    hasEndTime ? 'text-[#d4af37]' : 'text-zinc-500 hover:text-zinc-300'
+                  )}
+                >
+                  <div className={cn(
+                    'w-8 h-[18px] rounded-full relative transition-colors duration-300',
+                    hasEndTime ? 'bg-[#d4af37]' : 'bg-zinc-700'
+                  )}>
+                    <div className={cn(
+                      'absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white transition-all duration-300',
+                      hasEndTime ? 'left-[16px]' : 'left-[2px]'
+                    )} />
+                  </div>
+                  Adicionar horário de fim
+                </button>
+
+                {/* Fim (condicional) */}
+                {hasEndTime && (
+                  <div className="flex items-center gap-3 animate-in slide-in-from-top-2 fade-in duration-200">
+                    <span className="text-xs font-heading uppercase tracking-wider text-zinc-500 w-12 flex-shrink-0">Fim</span>
+                    <TimePickerHotbar
+                      value={newReminderTimeEnd}
+                      onChange={setNewReminderTimeEnd}
+                      className="flex-1 bg-zinc-900 border-zinc-700"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Botões de ação */}
             <div className="flex gap-3 pt-4">
               <button
                 onClick={() => {
                   setIsAddModalOpen(false)
+                  setEditingReminder(null)
                   setNewReminderText('')
-                  setNewReminderTime('')
+                  setNewReminderTimeStart('')
+                  setNewReminderTimeEnd('')
+                  setHasEndTime(false)
                   setNewReminderDate(null)
                 }}
-                className="flex-1 px-4 py-3 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700 transition-colors"
+                className="flex-1 px-4 py-3 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700 transition-colors font-heading uppercase tracking-widest text-sm"
               >
                 CANCELAR
               </button>
               <button
                 onClick={handleSaveReminder}
-                className="flex-1 px-4 py-3 bg-[#d4af37] text-black font-heading uppercase tracking-widest rounded-lg hover:bg-[#d4af37]/90 transition-colors"
+                className="flex-1 px-4 py-3 bg-[#d4af37] text-black font-heading uppercase tracking-widest rounded-lg hover:bg-[#d4af37]/90 transition-colors text-sm"
               >
                 SALVAR
               </button>
@@ -692,6 +1042,8 @@ function DayViewContent({
   reminders,
   onToggleReminder,
   onDeleteReminder,
+  onEditReminder,
+  onGoToFocus,
 }: {
   today: Date
   timeline: TimelineItem[]
@@ -699,6 +1051,8 @@ function DayViewContent({
   reminders: Reminder[]
   onToggleReminder: (id: string) => void
   onDeleteReminder: (id: string) => void
+  onEditReminder: (reminder: Reminder) => void
+  onGoToFocus: (title: string) => void
 }) {
   return (
     <section>
@@ -728,12 +1082,53 @@ function DayViewContent({
                     key={item.id}
                     className={cn(
                       'flex items-start gap-3 p-4 rounded-lg border',
-                      item.isRecurring
+                      item.isFreeSlot
+                        ? 'bg-[#d4af37]/5 border-[#d4af37]/20 border-dashed'
+                        : item.isRecurring
                         ? 'bg-[#d4af37]/5 border-[#d4af37]/20'
                         : 'bg-white/5 border-white/10',
                       isCompleted && 'opacity-60'
                     )}
                   >
+                    {/* Free slot — render especial */}
+                    {item.isFreeSlot ? (
+                      <>
+                        <div className="flex-shrink-0 mt-0.5">
+                          <svg className="w-4 h-4 text-[#d4af37]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M17 8C8 10 5.9 16.17 3.82 21.34l1.89.66l.95-2.3c.48.17.98.3 1.34.3C19 20 22 3 22 3c-1 2-8 2.25-13 3.25S2 11.5 2 13.5s1.75 3.75 1.75 3.75" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-mono text-[#d4af37]/80 font-medium">
+                              {item.time}
+                            </span>
+                            <span className="text-[10px] uppercase tracking-wider text-[#d4af37]/60">
+                              Disponível
+                            </span>
+                          </div>
+                          <div className="mt-3">
+                            <p className="text-base text-white/70 font-body">
+                              {(() => {
+                                if (!item.time) return item.title
+                                const rangeMatch = item.time.match(/^(\d{2}):(\d{2})\s*-\s*(\d{2}):(\d{2})$/)
+                                if (!rangeMatch) return item.title
+                                const startMin = parseInt(rangeMatch[1]) * 60 + parseInt(rangeMatch[2])
+                                const endMin = parseInt(rangeMatch[3]) * 60 + parseInt(rangeMatch[4])
+                                const diffMin = endMin - startMin
+                                const h = Math.floor(diffMin / 60)
+                                const m = diffMin % 60
+                                if (h > 0 && m > 0) return `${h} h ${m} min livre`
+                                if (h > 0) return `${h} h livre`
+                                return `${m} min livre`
+                              })()}
+                            </p>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                    <>
+
                     {/* Checkbox */}
                     {item.isReminder && (
                       <button
@@ -771,7 +1166,7 @@ function DayViewContent({
                         ) : (
                           <span className="text-xs text-zinc-500 italic">Dia Todo</span>
                         )}
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           {item.isRecurring && (
                             <span className="text-[10px] uppercase tracking-wider text-[#d4af37]/60">
                               Hábito
@@ -782,14 +1177,40 @@ function DayViewContent({
                               Lembrete
                             </span>
                           )}
-                          {/* AÇÃO 2: Botão de Excluir - Apenas para Lembretes */}
+                          {/* Botão Play → Focus */}
+                          {item.isReminder && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onGoToFocus(item.title)
+                              }}
+                              className="p-1.5 text-[#d4af37]/50 hover:text-[#d4af37] rounded hover:bg-[#d4af37]/10 transition-colors"
+                              title="Iniciar Focus"
+                            >
+                              <Play className="w-4 h-4" strokeWidth={2} fill="currentColor" />
+                            </button>
+                          )}
+                          {/* Botão Editar (Lápis) */}
+                          {item.isReminder && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (reminder) onEditReminder(reminder)
+                              }}
+                              className="p-1.5 text-zinc-500 hover:text-white rounded hover:bg-white/10 transition-colors"
+                              title="Editar lembrete"
+                            >
+                              <Pencil className="w-3.5 h-3.5" strokeWidth={2} />
+                            </button>
+                          )}
+                          {/* Botão de Excluir - Apenas para Lembretes */}
                           {item.isReminder && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
                                 onDeleteReminder(item.id)
                               }}
-                              className="p-1.5 text-red-500/50 hover:text-red-500 rounded hover:bg-red-500/10"
+                              className="p-1.5 text-red-500/50 hover:text-red-500 rounded hover:bg-red-500/10 transition-colors"
                               title="Excluir lembrete"
                             >
                               <Trash2 className="w-4 h-4" strokeWidth={2} />
@@ -804,6 +1225,8 @@ function DayViewContent({
                         {item.title}
                       </p>
                     </div>
+                    </>
+                    )}
                   </div>
                 )
               })}
@@ -836,7 +1259,7 @@ function WeekViewContent({
       <h2 className="text-xl font-heading uppercase tracking-widest text-[#d4af37] mb-6 text-center">
         SEMANA
       </h2>
-      <div className="grid grid-cols-7 gap-4">
+      <div className="grid grid-cols-7 gap-1 sm:gap-2 md:gap-4">
         {weekDays.map((date, index) => {
           const dayReminders = reminders.filter(r => isSameDay(r.date, date))
           const isToday = isSameDay(date, today)
@@ -846,21 +1269,22 @@ function WeekViewContent({
               key={index}
               onClick={() => onDayClick(date)}
               className={cn(
-                'p-4 rounded-lg border text-left',
+                'p-1 sm:p-2 md:p-4 rounded-lg border flex flex-col items-center justify-center transition-colors',
                 isToday
                   ? 'bg-[#d4af37]/20 border-[#d4af37]'
                   : 'bg-zinc-900 border-zinc-800 hover:border-[#d4af37]/30'
               )}
             >
-              <div className="text-sm font-heading uppercase tracking-wider text-zinc-400 mb-2">
+              <div className="text-[9px] sm:text-[10px] md:text-sm font-heading uppercase tracking-wider text-zinc-400 mb-1 md:mb-2 text-center">
                 {WEEKDAYS[date.getDay()]}
               </div>
-              <div className={cn('text-2xl font-bold mb-2', isToday ? 'text-[#d4af37]' : 'text-white')}>
+              <div className={cn('text-lg sm:text-xl md:text-2xl font-bold mb-1 md:mb-2 text-center', isToday ? 'text-[#d4af37]' : 'text-white')}>
                 {date.getDate()}
               </div>
               {dayReminders.length > 0 && (
-                <div className="text-xs text-zinc-500">
-                  {dayReminders.length} lembrete{dayReminders.length > 1 ? 's' : ''}
+                <div className="text-[8px] sm:text-[9px] md:text-xs text-zinc-500 text-center leading-tight">
+                  <span className="md:hidden">{dayReminders.length} item{dayReminders.length > 1 ? 's' : ''}</span>
+                  <span className="hidden md:inline">{dayReminders.length} lembrete{dayReminders.length > 1 ? 's' : ''}</span>
                 </div>
               )}
             </button>
